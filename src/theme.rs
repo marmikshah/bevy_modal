@@ -49,6 +49,8 @@ pub struct Theme {
     /// Cap on the built-in panel's width, so it doesn't stretch absurdly wide on
     /// tablets/desktop. The panel is `82%` of the screen, clamped to this.
     pub panel_max_width: f32,
+    /// Most toasts shown at once; the oldest are dismissed past this. `0` = no cap.
+    pub max_toasts: usize,
 }
 
 impl Default for Theme {
@@ -77,6 +79,7 @@ impl Default for Theme {
             panel_scale_from: 0.92,
             toast_position: ToastPosition::Top,
             panel_max_width: 420.0,
+            max_toasts: 4,
         }
     }
 }

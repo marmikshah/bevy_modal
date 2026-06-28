@@ -105,6 +105,7 @@ impl Plugin for ModalPlugin {
                         .chain(),
                     build::react_buttons,
                     toast::expire_toasts,
+                    toast::cap_toasts,
                     safe_area::apply_safe_area,
                 ),
             );
