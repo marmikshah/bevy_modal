@@ -16,7 +16,7 @@ use bevy::time::TimeUpdateStrategy;
 use crate::events::{CloseReason, OverlayClosed, OverlayOpened};
 use crate::focus::{Focusable, Focused};
 use crate::stack::{Z_BASE, Z_STEP};
-use crate::toast::ToastLayer;
+use crate::toast::{Toast, ToastLayer};
 use crate::transition::OverlayBody;
 use crate::{
     ModalPlugin, OverlayCommandsExt, OverlayStack, SafeAreaInsets, Theme, UiCapturing, overlay,
@@ -477,6 +477,57 @@ fn direct_despawn_emits_closed_with_despawned_reason() {
         event_log(&app).closed,
         vec![("a".to_string(), CloseReason::Despawned)]
     );
+}
+
+#[test]
+fn action_button_is_added_only_with_an_action() {
+    let mut app = test_app();
+
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            toast(&mut commands, "hi").push();
+        })
+        .unwrap();
+    app.update();
+    let plain = app
+        .world_mut()
+        .query_filtered::<Entity, With<Button>>()
+        .iter(app.world())
+        .count();
+    assert_eq!(plain, 0, "a plain toast has no button");
+
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            toast(&mut commands, "Saved").action("Undo", |_| {}).push();
+        })
+        .unwrap();
+    app.update();
+    let with_action = app
+        .world_mut()
+        .query_filtered::<Entity, With<Button>>()
+        .iter(app.world())
+        .count();
+    assert_eq!(with_action, 1, "an action toast adds one button");
+}
+
+#[test]
+fn visible_toasts_are_capped() {
+    let mut app = test_app(); // Theme::max_toasts defaults to 4
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            for i in 0..6 {
+                toast(&mut commands, format!("t{i}")).push();
+            }
+        })
+        .unwrap();
+    app.update(); // cap_toasts dismisses the two oldest
+
+    let count = app
+        .world_mut()
+        .query_filtered::<Entity, With<Toast>>()
+        .iter(app.world())
+        .count();
+    assert_eq!(count, 4, "visible toasts are capped at max_toasts");
 }
 
 #[test]
