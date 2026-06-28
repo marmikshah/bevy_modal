@@ -30,6 +30,9 @@ use crate::theme::Theme;
 /// Toasts float above overlays; they're notifications, not modals.
 pub(crate) const TOAST_Z: i32 = 100_000;
 
+/// Gap between the toast column and its screen edge, before any safe-area inset.
+pub(crate) const TOAST_EDGE_MARGIN: f32 = 16.0;
+
 /// Default lifetime when a builder doesn't set one.
 const DEFAULT_DURATION: Duration = Duration::from_secs(4);
 
@@ -196,8 +199,8 @@ fn find_or_spawn_layer(world: &mut World, position: ToastPosition) -> Entity {
         ..default()
     };
     match position {
-        ToastPosition::Top => node.top = Val::Px(16.0),
-        ToastPosition::Bottom => node.bottom = Val::Px(16.0),
+        ToastPosition::Top => node.top = Val::Px(TOAST_EDGE_MARGIN),
+        ToastPosition::Bottom => node.bottom = Val::Px(TOAST_EDGE_MARGIN),
     }
     world.spawn((ToastLayer, node, GlobalZIndex(TOAST_Z))).id()
 }

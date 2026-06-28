@@ -44,6 +44,7 @@ mod confirm;
 mod events;
 mod focus;
 mod gate;
+mod safe_area;
 mod scrim;
 mod stack;
 mod theme;
@@ -57,6 +58,7 @@ pub use build::{OverlayBuilder, overlay};
 pub use confirm::{ConfirmBuilder, confirm};
 pub use events::{CloseReason, OverlayClosed, OverlayOpened};
 pub use gate::{UiCapturing, ui_not_capturing};
+pub use safe_area::SafeAreaInsets;
 pub use stack::{Overlay, OverlayCommandsExt, OverlayStack};
 pub use theme::Theme;
 pub use toast::{ToastBuilder, ToastLevel, ToastPosition, toast};
@@ -64,8 +66,8 @@ pub use toast::{ToastBuilder, ToastLevel, ToastPosition, toast};
 pub mod prelude {
     pub use crate::{
         CloseReason, ConfirmBuilder, ModalPlugin, Overlay, OverlayBuilder, OverlayClosed,
-        OverlayCommandsExt, OverlayOpened, OverlayStack, Theme, ToastBuilder, ToastLevel,
-        ToastPosition, UiCapturing, confirm, overlay, toast, ui_not_capturing,
+        OverlayCommandsExt, OverlayOpened, OverlayStack, SafeAreaInsets, Theme, ToastBuilder,
+        ToastLevel, ToastPosition, UiCapturing, confirm, overlay, toast, ui_not_capturing,
     };
 }
 
@@ -82,6 +84,7 @@ impl Plugin for ModalPlugin {
             .init_resource::<UiCapturing>()
             .init_resource::<Theme>()
             .init_resource::<events::CloseReasons>()
+            .init_resource::<SafeAreaInsets>()
             .add_message::<OverlayOpened>()
             .add_message::<OverlayClosed>()
             .add_systems(
@@ -102,6 +105,7 @@ impl Plugin for ModalPlugin {
                         .chain(),
                     build::react_buttons,
                     toast::expire_toasts,
+                    safe_area::apply_safe_area,
                 ),
             );
     }
