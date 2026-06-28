@@ -33,6 +33,10 @@ pub(crate) const TOAST_Z: i32 = 100_000;
 /// Gap between the toast column and its screen edge, before any safe-area inset.
 pub(crate) const TOAST_EDGE_MARGIN: f32 = 16.0;
 
+/// A toast action: a label and the callback its button runs (the toast dismisses
+/// after). Boxed `FnMut` so the builder stays non-generic, like the overlay one.
+type ToastAction = (String, Box<dyn FnMut(&mut Commands) + Send + Sync>);
+
 /// Default lifetime when a builder doesn't set one.
 const DEFAULT_DURATION: Duration = Duration::from_secs(4);
 
@@ -90,6 +94,7 @@ pub fn toast<'a, 'w, 's>(
             message: message.into(),
             accent: None,
             level: ToastLevel::Info,
+            action: None,
             duration: DEFAULT_DURATION,
         },
     }
@@ -122,6 +127,17 @@ impl ToastBuilder<'_, '_, '_> {
         self
     }
 
+    /// Add an action button. `on_click` runs on press with `&mut Commands`; the
+    /// toast dismisses afterwards (e.g. an "Undo").
+    pub fn action(
+        mut self,
+        label: impl Into<String>,
+        on_click: impl FnMut(&mut Commands) + Send + Sync + 'static,
+    ) -> Self {
+        self.spec.action = Some((label.into(), Box::new(on_click)));
+        self
+    }
+
     /// Queue the spawn. Nothing happens until command application.
     pub fn push(self) {
         self.commands.queue(self.spec);
@@ -134,6 +150,7 @@ struct SpawnToast {
     message: String,
     accent: Option<Color>,
     level: ToastLevel,
+    action: Option<ToastAction>,
     duration: Duration,
 }
 
@@ -173,7 +190,46 @@ impl Command for SpawnToast {
             .id();
         world.entity_mut(toast).add_child(label);
         world.entity_mut(layer).add_child(toast);
-        // Tap to dismiss early.
+
+        // Optional action button. Its click runs the callback; the click then
+        // bubbles to the toast's dismiss observer below, so the toast closes once
+        // (no separate despawn here).
+        if let Some((text, mut on_click)) = self.action {
+            let button = world
+                .spawn((
+                    Node {
+                        margin: UiRect::top(Val::Px(8.0)),
+                        align_self: AlignSelf::Start,
+                        padding: UiRect::axes(Val::Px(10.0), Val::Px(4.0)),
+                        border: UiRect::all(Val::Px(theme.button_border)),
+                        ..default()
+                    },
+                    Button,
+                    BackgroundColor(accent.with_alpha(0.16)),
+                    BorderColor::all(accent),
+                ))
+                .id();
+            let button_label = world
+                .spawn((
+                    Text::new(text),
+                    TextFont {
+                        font: theme.body.clone().into(),
+                        font_size: FontSize::Px(16.0),
+                        ..default()
+                    },
+                    TextColor(accent),
+                ))
+                .id();
+            world.entity_mut(button).add_child(button_label);
+            world.entity_mut(toast).add_child(button);
+            world
+                .entity_mut(button)
+                .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
+                    on_click(&mut commands);
+                });
+        }
+
+        // Tap to dismiss early (also fires for a bubbled action-button click).
         world
             .entity_mut(toast)
             .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
