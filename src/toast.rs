@@ -16,6 +16,7 @@
 
 use std::time::Duration;
 
+use bevy::picking::prelude::*;
 use bevy::prelude::*;
 
 use crate::theme::Theme;
@@ -147,6 +148,7 @@ impl Command for SpawnToast {
                 },
                 BackgroundColor(theme.ink),
                 BorderColor::all(accent),
+                Pickable::default(),
             ))
             .id();
         let label = world
@@ -162,6 +164,12 @@ impl Command for SpawnToast {
             .id();
         world.entity_mut(toast).add_child(label);
         world.entity_mut(layer).add_child(toast);
+        // Tap to dismiss early.
+        world.entity_mut(toast).observe(
+            move |_: On<Pointer<Click>>, mut commands: Commands| {
+                commands.entity(toast).despawn();
+            },
+        );
     }
 }
 
