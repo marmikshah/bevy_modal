@@ -220,14 +220,19 @@ Lifecycle is yours to choose:
 - **state-driven** — spawn on `OnEnter`, despawn the `Overlay` on `OnExit`;
   leave dismiss/escape **off** so the state machine stays authoritative.
 
-## Example
+## Examples
 
 ```
-cargo run --example stacked
+cargo run --example showcase   # a button per feature: overlays, stacking,
+                               # confirm, toast levels + action, content, events
+cargo run --example stacked    # the core: two stacked overlays + the input gate
 ```
 
-Two stacked overlays, a confirm dialog and a toast; the spinning sprite freezes
-while any overlay is open (but not for a toast).
+- **`showcase`** — a menu that opens each kind of overlay/dialog, fires toasts of
+  every level (and one with an action), and surfaces `OverlayOpened`/`Closed` as
+  toasts. Overlays animate in/out and are keyboard-navigable (Tab/arrows/Enter).
+- **`stacked`** — the bug `bevy_modal` kills: a smaller overlay over a larger one,
+  with a spinning sprite that freezes while any overlay is up (the UI→gameplay gate).
 
 ## Testing
 
