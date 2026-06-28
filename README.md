@@ -210,8 +210,10 @@ Two tiers, pick per screen:
 - **Built-in panel** — `overlay(c, id).title(..).body(..).button(label, on_click)`.
   The crate builds the panel; good for simple dialogs.
 - **Bespoke content** — `overlay(c, id).content(|parent| { /* your bevy_ui */ })`.
-  The crate owns the (scrimmed, stacked, gated) root; you fill it. For settings
-  grids, icon rows, anything it shouldn't try to model.
+  The crate owns the (scrimmed, stacked, gated) root; you fill it. The closure
+  gets a `&mut ChildSpawnerCommands` — the spawner `Commands::spawn().with_children`
+  hands you — so your existing `bevy_ui` builder helpers drop straight in. For
+  settings grids, icon rows, anything it shouldn't try to model.
 
 Lifecycle is yours to choose:
 
