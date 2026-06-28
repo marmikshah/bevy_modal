@@ -41,6 +41,7 @@ use bevy::prelude::*;
 
 mod build;
 mod confirm;
+mod events;
 mod focus;
 mod gate;
 mod scrim;
@@ -54,6 +55,7 @@ mod tests;
 
 pub use build::{OverlayBuilder, overlay};
 pub use confirm::{ConfirmBuilder, confirm};
+pub use events::{CloseReason, OverlayClosed, OverlayOpened};
 pub use gate::{UiCapturing, ui_not_capturing};
 pub use stack::{Overlay, OverlayCommandsExt, OverlayStack};
 pub use theme::Theme;
@@ -61,15 +63,17 @@ pub use toast::{ToastBuilder, toast};
 
 pub mod prelude {
     pub use crate::{
-        ConfirmBuilder, ModalPlugin, Overlay, OverlayBuilder, OverlayCommandsExt, OverlayStack,
-        Theme, ToastBuilder, UiCapturing, confirm, overlay, toast, ui_not_capturing,
+        CloseReason, ConfirmBuilder, ModalPlugin, Overlay, OverlayBuilder, OverlayClosed,
+        OverlayCommandsExt, OverlayOpened, OverlayStack, Theme, ToastBuilder, UiCapturing, confirm,
+        overlay, toast, ui_not_capturing,
     };
 }
 
 /// Wires the overlay stack, the open/close transitions, focus + keyboard
-/// navigation, the input-capture gate, the toast expiry sweep and the button
-/// feedback systems. Insert your own [`Theme`] before or after — a neutral
-/// default is registered here so examples run with zero setup.
+/// navigation, lifecycle messages ([`OverlayOpened`] / [`OverlayClosed`]), the
+/// input-capture gate, the toast expiry sweep and the button feedback systems.
+/// Insert your own [`Theme`] before or after — a neutral default is registered
+/// here so examples run with zero setup.
 pub struct ModalPlugin;
 
 impl Plugin for ModalPlugin {
@@ -77,10 +81,14 @@ impl Plugin for ModalPlugin {
         app.init_resource::<OverlayStack>()
             .init_resource::<UiCapturing>()
             .init_resource::<Theme>()
+            .init_resource::<events::CloseReasons>()
+            .add_message::<OverlayOpened>()
+            .add_message::<OverlayClosed>()
             .add_systems(
                 Update,
                 (
                     transition::drive_transitions,
+                    events::announce_opened,
                     stack::prune_despawned_overlays,
                     stack::escape_pops_top,
                     // Focus systems run in order so the per-frame focus decision

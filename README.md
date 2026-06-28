@@ -143,6 +143,29 @@ scrim tap — plays the exit, then despawns. A **direct `despawn()`** (e.g. a st
 machine on `OnExit`) still closes instantly. The input gate stays armed until the
 overlay is fully gone, so input never leaks under a still-visible modal.
 
+## Focus & keyboard navigation
+
+Built-in panel buttons are navigable without a pointer: opening an overlay focuses
+its first button, `Tab`/`Shift+Tab` and the arrow keys move focus (wrapping),
+`Enter`/`Space` activate it, and hovering focuses so pointer and keyboard agree.
+Only the top overlay participates. (`.content()` overlays own their own input.)
+
+## Lifecycle events
+
+React to overlays opening and closing with two messages — useful for sound/haptic
+cues, pausing the game, or analytics:
+
+```rust
+fn react(mut opened: MessageReader<OverlayOpened>, mut closed: MessageReader<OverlayClosed>) {
+    for OverlayOpened(id) in opened.read() { /* play a swoosh */ }
+    for c in closed.read() {
+        // c.reason: Dismissed | Escape | Scrim | Despawned
+    }
+}
+```
+
+`OverlayClosed` fires for *every* close path, tagged with a `CloseReason`.
+
 ## Compatibility
 
 | `bevy_modal` | `bevy` |
@@ -192,9 +215,9 @@ cargo test
 
 ## Limitations / roadmap
 
-- **No focus trap or directional (keyboard/gamepad) nav yet.** Touch/mouse
-  only. This is the main gap for full accessibility and is the next planned
-  addition.
+- Keyboard + pointer navigation only — **no gamepad** (by choice).
+- Toasts are minimal for now: severity levels, positioning and an action button
+  are planned.
 - Built-in panel is intentionally minimal (title / body / buttons). Richer
   layouts go through `.content()` — by design, not omission.
 
