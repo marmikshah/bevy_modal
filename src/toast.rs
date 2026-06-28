@@ -4,7 +4,9 @@
 //! (or on tap). They stack in a single column — pinned to the top or bottom edge
 //! per [`Theme::toast_position`](crate::Theme) — so multiple toasts pile
 //! deterministically rather than overdrawing one another. A [`ToastLevel`] picks
-//! the accent border from the theme's semantic colours.
+//! the accent border from the theme's semantic colours, `.action(..)` adds an
+//! optional button, and at most `Theme::max_toasts` show at once (oldest first
+//! out).
 //!
 //! ```no_run
 //! use bevy::prelude::*;
@@ -222,11 +224,11 @@ impl Command for SpawnToast {
                 .id();
             world.entity_mut(button).add_child(button_label);
             world.entity_mut(toast).add_child(button);
-            world
-                .entity_mut(button)
-                .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
+            world.entity_mut(button).observe(
+                move |_: On<Pointer<Click>>, mut commands: Commands| {
                     on_click(&mut commands);
-                });
+                },
+            );
         }
 
         // Tap to dismiss early (also fires for a bubbled action-button click).
