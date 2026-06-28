@@ -89,6 +89,7 @@ struct SpawnToast {
 }
 
 impl Command for SpawnToast {
+    type Out = ();
     fn apply(self, world: &mut World) {
         let theme = world.resource::<Theme>().clone();
         let accent = self.accent.unwrap_or(theme.accent);
@@ -113,8 +114,8 @@ impl Command for SpawnToast {
             .spawn((
                 Text::new(self.message),
                 TextFont {
-                    font: theme.body.clone(),
-                    font_size: 20.0,
+                    font: theme.body.clone().into(),
+                    font_size: FontSize::Px(20.0),
                     ..default()
                 },
                 TextColor(theme.text),

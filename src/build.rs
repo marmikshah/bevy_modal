@@ -141,6 +141,7 @@ struct SpawnOverlay {
 }
 
 impl Command for SpawnOverlay {
+    type Out = ();
     fn apply(self, world: &mut World) {
         // Race-free dedup: by the time this command applies, any earlier
         // same-frame spawn of the same id has already registered on the stack.
@@ -213,8 +214,8 @@ impl Command for SpawnOverlay {
                 .spawn((
                     Text::new(title),
                     TextFont {
-                        font: theme.display.clone(),
-                        font_size: 28.0,
+                        font: theme.display.clone().into(),
+                        font_size: FontSize::Px(28.0),
                         ..default()
                     },
                     TextColor(accent),
@@ -228,8 +229,8 @@ impl Command for SpawnOverlay {
                 .spawn((
                     Text::new(line),
                     TextFont {
-                        font: theme.body.clone(),
-                        font_size: 22.0,
+                        font: theme.body.clone().into(),
+                        font_size: FontSize::Px(22.0),
                         ..default()
                     },
                     TextColor(theme.text_dim),
@@ -258,8 +259,8 @@ impl Command for SpawnOverlay {
                 .spawn((
                     Text::new(text),
                     TextFont {
-                        font: theme.body.clone(),
-                        font_size: 24.0,
+                        font: theme.body.clone().into(),
+                        font_size: FontSize::Px(24.0),
                         ..default()
                     },
                     TextColor(theme.text),
