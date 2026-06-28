@@ -13,8 +13,11 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
 
+use bevy::ui::FocusPolicy;
+
 use crate::events::{CloseReason, OverlayClosed, OverlayOpened};
 use crate::focus::{Focusable, Focused};
+use crate::scrim::Scrim;
 use crate::stack::{Z_BASE, Z_STEP};
 use crate::toast::{Toast, ToastLayer};
 use crate::transition::OverlayBody;
@@ -528,6 +531,30 @@ fn visible_toasts_are_capped() {
         .iter(app.world())
         .count();
     assert_eq!(count, 4, "visible toasts are capped at max_toasts");
+}
+
+#[test]
+fn scrim_blocks_the_interaction_path() {
+    // `ui_focus_system` (which drives `Interaction` for ordinary `Button`s) only
+    // stops at a `FocusPolicy::Block`. `Node` auto-adds `FocusPolicy::Pass`, so
+    // the scrim must override it to Block — otherwise clicks fall through to the
+    // buttons underneath. (The picking path is covered by `Pickable::default()`.)
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "m").push();
+        })
+        .unwrap();
+    app.update();
+
+    let mut query = app
+        .world_mut()
+        .query_filtered::<&FocusPolicy, With<Scrim>>();
+    let policy = query.iter(app.world()).next().expect("a scrim");
+    assert!(
+        matches!(policy, FocusPolicy::Block),
+        "scrim must block the Interaction path, not pass through"
+    );
 }
 
 #[test]
