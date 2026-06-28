@@ -8,6 +8,7 @@
 use bevy::picking::prelude::*;
 use bevy::prelude::*;
 
+use crate::events::CloseReason;
 use crate::focus::{Focusable, Focused};
 use crate::scrim::scrim_bundle;
 use crate::stack::{Overlay, OverlayStack, Z_BASE, Z_STEP, push_root};
@@ -196,7 +197,9 @@ impl Command for SpawnOverlay {
         if self.dismissable {
             world.entity_mut(scrim).observe(
                 move |_: On<Pointer<Click>>, mut commands: Commands| {
-                    commands.queue(move |world: &mut World| request_close(world, root));
+                    commands.queue(move |world: &mut World| {
+                        request_close(world, root, CloseReason::Scrim)
+                    });
                 },
             );
         }

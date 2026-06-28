@@ -13,6 +13,7 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
 
+use crate::events::{CloseReason, OverlayClosed, OverlayOpened};
 use crate::focus::{Focusable, Focused};
 use crate::stack::{Z_BASE, Z_STEP};
 use crate::{ModalPlugin, OverlayCommandsExt, OverlayStack, UiCapturing, overlay};
@@ -61,6 +62,38 @@ fn focusables_of(app: &mut App, overlay: Entity) -> Vec<Entity> {
 
 fn is_focused(app: &App, entity: Entity) -> bool {
     app.world().get::<Focused>(entity).is_some()
+}
+
+/// Accumulates lifecycle messages so assertions don't race the message buffer.
+#[derive(Resource, Default, Clone)]
+struct EventLog {
+    opened: Vec<String>,
+    closed: Vec<(String, CloseReason)>,
+}
+
+fn record_events(
+    mut log: ResMut<EventLog>,
+    mut opened: MessageReader<OverlayOpened>,
+    mut closed: MessageReader<OverlayClosed>,
+) {
+    for OverlayOpened(id) in opened.read() {
+        log.opened.push(id.clone());
+    }
+    for closed in closed.read() {
+        log.closed.push((closed.id.clone(), closed.reason));
+    }
+}
+
+/// A [`test_app`] that records lifecycle messages into [`EventLog`].
+fn event_app() -> App {
+    let mut app = test_app();
+    app.init_resource::<EventLog>();
+    app.add_systems(Update, record_events);
+    app
+}
+
+fn event_log(app: &App) -> EventLog {
+    app.world().resource::<EventLog>().clone()
 }
 
 /// Press a key, run the frame that reacts to it, then fully release it. Without
@@ -363,6 +396,81 @@ fn focus_follows_the_top_overlay() {
     assert!(
         is_focused(&app, a0),
         "focus returns to the revealed overlay"
+    );
+}
+
+#[test]
+fn opening_emits_overlay_opened() {
+    let mut app = event_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "pause").push();
+        })
+        .unwrap();
+    app.update();
+    app.update();
+    assert_eq!(event_log(&app).opened, vec!["pause".to_string()]);
+}
+
+#[test]
+fn dismiss_emits_closed_with_dismissed_reason() {
+    let mut app = event_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "a").push();
+        })
+        .unwrap();
+    app.update();
+
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            commands.dismiss_overlay("a");
+        })
+        .unwrap();
+    settle(&mut app);
+
+    assert_eq!(
+        event_log(&app).closed,
+        vec![("a".to_string(), CloseReason::Dismissed)]
+    );
+}
+
+#[test]
+fn escape_emits_closed_with_escape_reason() {
+    let mut app = event_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "a").escape(true).push();
+        })
+        .unwrap();
+    app.update();
+
+    press_escape_once(&mut app);
+
+    assert_eq!(
+        event_log(&app).closed,
+        vec![("a".to_string(), CloseReason::Escape)]
+    );
+}
+
+#[test]
+fn direct_despawn_emits_closed_with_despawned_reason() {
+    let mut app = event_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "a").push();
+        })
+        .unwrap();
+    app.update();
+
+    let root = app.world().resource::<OverlayStack>().roots[0];
+    app.world_mut().entity_mut(root).despawn();
+    app.update();
+    app.update();
+
+    assert_eq!(
+        event_log(&app).closed,
+        vec![("a".to_string(), CloseReason::Despawned)]
     );
 }
 

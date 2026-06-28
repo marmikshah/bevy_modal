@@ -4,6 +4,7 @@
 
 use bevy::prelude::*;
 
+use crate::events::{CloseReason, CloseReasons, OverlayClosed};
 use crate::gate::UiCapturing;
 use crate::transition::request_close;
 
@@ -91,13 +92,20 @@ pub(crate) fn prune_despawned_overlays(
     mut removed: RemovedComponents<Overlay>,
     mut stack: ResMut<OverlayStack>,
     mut capturing: ResMut<UiCapturing>,
+    mut reasons: ResMut<CloseReasons>,
+    mut closed: MessageWriter<OverlayClosed>,
 ) {
     let mut changed = false;
     for entity in removed.read() {
         if let Some(i) = stack.roots.iter().position(|&r| r == entity) {
             stack.roots.remove(i);
-            stack.ids.remove(i);
+            let id = stack.ids.remove(i);
+            // A close recorded its reason; a direct despawn left none.
+            let reason = reasons.0.remove(&entity).unwrap_or(CloseReason::Despawned);
+            closed.write(OverlayClosed { id, reason });
             changed = true;
+        } else {
+            reasons.0.remove(&entity);
         }
     }
     if changed {
@@ -119,7 +127,7 @@ pub(crate) fn escape_pops_top(
         && let Ok(overlay) = overlays.get(top)
         && overlay.pop_on_escape
     {
-        commands.queue(move |world: &mut World| request_close(world, top));
+        commands.queue(move |world: &mut World| request_close(world, top, CloseReason::Escape));
     }
 }
 
@@ -137,7 +145,7 @@ impl OverlayCommandsExt for Commands<'_, '_> {
         let id = id.into();
         self.queue(move |world: &mut World| {
             if let Some(e) = world.resource::<OverlayStack>().entity(&id) {
-                request_close(world, e);
+                request_close(world, e, CloseReason::Dismissed);
             }
         });
     }

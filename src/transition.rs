@@ -15,6 +15,8 @@
 
 use bevy::prelude::*;
 
+use crate::events::{CloseReason, CloseReasons};
+
 /// Tags the foreground node (built-in panel or content wrapper) so the
 /// transition scales it without scaling the full-screen scrim.
 #[derive(Component)]
@@ -60,15 +62,21 @@ impl Transition {
     }
 }
 
-/// Begin closing the overlay `root`: ease out, then despawn. Idempotent — calling
-/// it again on an already-closing overlay is a no-op. If `root` has no
-/// [`Transition`] (it was spawned without one, or is already gone), despawn it
-/// outright so callers never have to special-case the instant path.
-pub(crate) fn request_close(world: &mut World, root: Entity) {
+/// Begin closing the overlay `root` for `reason`: ease out, then despawn. The
+/// reason is stashed so [`OverlayClosed`](crate::events::OverlayClosed) can report
+/// it when the root finally leaves the stack. Idempotent — a later call just
+/// overwrites the reason and re-targets the (already-closing) animation. An
+/// overlay with no [`Transition`] is despawned outright, so callers never special-
+/// case the instant path.
+pub(crate) fn request_close(world: &mut World, root: Entity, reason: CloseReason) {
+    if world.get_entity(root).is_err() {
+        return; // already gone
+    }
+    world.resource_mut::<CloseReasons>().0.insert(root, reason);
     if let Some(mut transition) = world.get_mut::<Transition>(root) {
         transition.target = 0.0;
-    } else if let Ok(entity) = world.get_entity_mut(root) {
-        entity.despawn();
+    } else {
+        world.entity_mut(root).despawn();
     }
 }
 
