@@ -35,7 +35,10 @@ impl ButtonAction {
 /// Fills the overlay root with caller-owned children (a bespoke panel + its
 /// content) instead of the built-in title/body/button panel. The escape hatch
 /// for screens the crate shouldn't try to model — settings grids, icon rows.
-type ContentFn = Box<dyn FnOnce(&mut ChildSpawner) + Send + Sync>;
+///
+/// Takes `&mut ChildSpawnerCommands` — the spawner `Commands::spawn().with_children`
+/// yields — so existing `bevy_ui` builder helpers drop in without re-authoring.
+type ContentFn = Box<dyn FnOnce(&mut ChildSpawnerCommands) + Send + Sync>;
 
 #[derive(Component, Clone, Copy)]
 pub(crate) struct ModalButtonStyle {
@@ -119,7 +122,14 @@ impl<'a, 'w, 's> OverlayBuilder<'a, 'w, 's> {
     /// Host caller-owned children instead of the built-in panel. When set,
     /// `title`/`body`/`button` are ignored — the closure owns everything under
     /// the (still scrimmed, stacked, gated) root. Use this for bespoke screens.
-    pub fn content(mut self, fill: impl FnOnce(&mut ChildSpawner) + Send + Sync + 'static) -> Self {
+    ///
+    /// The closure gets a `&mut ChildSpawnerCommands` (the same spawner
+    /// `Commands::spawn().with_children` hands you), so your existing `bevy_ui`
+    /// builder helpers pass straight in.
+    pub fn content(
+        mut self,
+        fill: impl FnOnce(&mut ChildSpawnerCommands) + Send + Sync + 'static,
+    ) -> Self {
         self.spec.content = Some(Box::new(fill));
         self
     }
@@ -217,7 +227,10 @@ impl Command for SpawnOverlay {
                 ))
                 .id();
             world.entity_mut(root).add_child(body);
-            world.entity_mut(body).with_children(content);
+            // Spawn the caller's content via `Commands` so the closure gets a
+            // `ChildSpawnerCommands` (the standard idiom). It defers to the next
+            // flush — fine here: nothing the same tick depends on these children.
+            world.commands().entity(body).with_children(content);
             body
         } else {
             let panel = world
