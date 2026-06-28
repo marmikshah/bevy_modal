@@ -5,6 +5,8 @@
 
 use bevy::prelude::*;
 
+use crate::toast::ToastPosition;
+
 #[derive(Resource, Clone)]
 pub struct Theme {
     /// Panel fill (and toast fill).
@@ -42,6 +44,8 @@ pub struct Theme {
     /// Panel/content scale at the start of the open (and end of the close); eases
     /// to 1.0. Slightly under 1 gives a subtle "pop". Set to 1.0 for fade-only.
     pub panel_scale_from: f32,
+    /// Which edge toasts stack against.
+    pub toast_position: ToastPosition,
 }
 
 impl Default for Theme {
@@ -68,6 +72,7 @@ impl Default for Theme {
             open_secs: 0.18,
             close_secs: 0.12,
             panel_scale_from: 0.92,
+            toast_position: ToastPosition::Top,
         }
     }
 }

@@ -47,6 +47,15 @@ impl ToastLevel {
     }
 }
 
+/// Which screen edge toasts stack against. Set on the [`Theme`]; fixed by the
+/// first toast that spawns the shared layer.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ToastPosition {
+    #[default]
+    Top,
+    Bottom,
+}
+
 /// Tags a toast node so [`expire_toasts`] can find it.
 #[derive(Component)]
 pub(crate) struct Toast;
@@ -124,7 +133,7 @@ impl Command for SpawnToast {
         let theme = world.resource::<Theme>().clone();
         let accent = self.accent.unwrap_or_else(|| self.level.color(&theme));
 
-        let layer = find_or_spawn_layer(world);
+        let layer = find_or_spawn_layer(world, theme.toast_position);
 
         let toast = world
             .spawn((
@@ -156,29 +165,27 @@ impl Command for SpawnToast {
     }
 }
 
-/// Reuse the existing toast column if one is up, else spawn it. Anchored to the
-/// top-centre and laid out as a column so toasts stack top-to-bottom.
-fn find_or_spawn_layer(world: &mut World) -> Entity {
+/// Reuse the existing toast column if one is up, else spawn it, anchored to the
+/// configured edge and laid out as a centred column with newest toasts last.
+fn find_or_spawn_layer(world: &mut World, position: ToastPosition) -> Entity {
     let mut existing = world.query_filtered::<Entity, With<ToastLayer>>();
     if let Some(layer) = existing.iter(world).next() {
         return layer;
     }
-    world
-        .spawn((
-            ToastLayer,
-            Node {
-                position_type: PositionType::Absolute,
-                top: Val::Px(16.0),
-                left: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(10.0),
-                ..default()
-            },
-            GlobalZIndex(TOAST_Z),
-        ))
-        .id()
+    let mut node = Node {
+        position_type: PositionType::Absolute,
+        left: Val::Px(0.0),
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Column,
+        align_items: AlignItems::Center,
+        row_gap: Val::Px(10.0),
+        ..default()
+    };
+    match position {
+        ToastPosition::Top => node.top = Val::Px(16.0),
+        ToastPosition::Bottom => node.bottom = Val::Px(16.0),
+    }
+    world.spawn((ToastLayer, node, GlobalZIndex(TOAST_Z))).id()
 }
 
 /// Ticks every toast's timer; despawns it (recursively, taking its label) when
