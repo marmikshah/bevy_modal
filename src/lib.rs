@@ -24,6 +24,10 @@
 //! dialog) and [`toast`] (transient, non-blocking notifications that never
 //! scrim or capture input).
 //!
+//! Overlays also animate in and out, support keyboard focus navigation, emit
+//! [`OverlayOpened`] / [`OverlayClosed`] lifecycle messages, and respect
+//! [`SafeAreaInsets`] — see the module docs and the README.
+//!
 //! ```no_run
 //! use bevy::prelude::*;
 //! use bevy_modal::prelude::*;
