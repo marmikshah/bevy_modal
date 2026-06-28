@@ -5,6 +5,8 @@
 
 use bevy::prelude::*;
 
+use crate::toast::ToastPosition;
+
 #[derive(Resource, Clone)]
 pub struct Theme {
     /// Panel fill (and toast fill).
@@ -19,6 +21,11 @@ pub struct Theme {
     pub scrim: Color,
     /// Default accent when a builder call doesn't specify one.
     pub accent: Color,
+    /// Semantic accents, selected by [`ToastLevel`](crate::ToastLevel) (and free
+    /// for your own UI). `Info` uses [`accent`](Self::accent).
+    pub success: Color,
+    pub warning: Color,
+    pub danger: Color,
     /// Display face (titles).
     pub display: Handle<Font>,
     /// Body face (labels, buttons, toasts).
@@ -37,6 +44,8 @@ pub struct Theme {
     /// Panel/content scale at the start of the open (and end of the close); eases
     /// to 1.0. Slightly under 1 gives a subtle "pop". Set to 1.0 for fade-only.
     pub panel_scale_from: f32,
+    /// Which edge toasts stack against.
+    pub toast_position: ToastPosition,
 }
 
 impl Default for Theme {
@@ -48,6 +57,9 @@ impl Default for Theme {
             text_dim: Color::srgb(0.55, 0.60, 0.78),
             scrim: Color::srgba(0.0, 0.0, 0.0, 0.6),
             accent: Color::srgb(0.45, 0.70, 1.0),
+            success: Color::srgb(0.40, 0.80, 0.55),
+            warning: Color::srgb(0.95, 0.75, 0.35),
+            danger: Color::srgb(0.95, 0.45, 0.45),
             display: Handle::default(),
             body: Handle::default(),
             panel_border: 3.0,
@@ -60,6 +72,7 @@ impl Default for Theme {
             open_secs: 0.18,
             close_secs: 0.12,
             panel_scale_from: 0.92,
+            toast_position: ToastPosition::Top,
         }
     }
 }

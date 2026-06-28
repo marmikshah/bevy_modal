@@ -69,15 +69,19 @@ fn open_pause(mut commands: Commands) {
 
 ### Toasts
 
-Transient, non-blocking — they never scrim or capture input, and auto-dismiss:
+Transient, non-blocking — they never scrim or capture input, and auto-dismiss
+(or on tap). Pick a severity with `.level(..)` (it selects the accent from the
+theme's `success`/`warning`/`danger`/`accent`), and stack them at the top or
+bottom edge via `Theme::toast_position`:
 
 ```rust
 use std::time::Duration;
 
 fn notify(mut commands: Commands) {
-    toast(&mut commands, "Saved")
-        .duration(Duration::from_secs(2))  // defaults to 4s
-        .accent(Color::srgb(0.4, 0.9, 0.5))
+    toast(&mut commands, "Saved").push();                 // Info, 4s, top
+    toast(&mut commands, "Upload failed")
+        .level(ToastLevel::Error)
+        .duration(Duration::from_secs(6))
         .push();
 }
 ```
@@ -216,8 +220,8 @@ cargo test
 ## Limitations / roadmap
 
 - Keyboard + pointer navigation only — **no gamepad** (by choice).
-- Toasts are minimal for now: severity levels, positioning and an action button
-  are planned.
+- Toasts have severity levels, top/bottom positioning and tap-to-dismiss; an
+  action button and a max-visible queue are still planned.
 - Built-in panel is intentionally minimal (title / body / buttons). Richer
   layouts go through `.content()` — by design, not omission.
 

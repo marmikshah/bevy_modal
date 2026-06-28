@@ -59,13 +59,13 @@ pub use events::{CloseReason, OverlayClosed, OverlayOpened};
 pub use gate::{UiCapturing, ui_not_capturing};
 pub use stack::{Overlay, OverlayCommandsExt, OverlayStack};
 pub use theme::Theme;
-pub use toast::{ToastBuilder, toast};
+pub use toast::{ToastBuilder, ToastLevel, ToastPosition, toast};
 
 pub mod prelude {
     pub use crate::{
         CloseReason, ConfirmBuilder, ModalPlugin, Overlay, OverlayBuilder, OverlayClosed,
-        OverlayCommandsExt, OverlayOpened, OverlayStack, Theme, ToastBuilder, UiCapturing, confirm,
-        overlay, toast, ui_not_capturing,
+        OverlayCommandsExt, OverlayOpened, OverlayStack, Theme, ToastBuilder, ToastLevel,
+        ToastPosition, UiCapturing, confirm, overlay, toast, ui_not_capturing,
     };
 }
 

@@ -1,8 +1,10 @@
 //! Toasts — transient, non-blocking notifications. Unlike an overlay, a toast
 //! draws no scrim, never touches [`OverlayStack`](crate::OverlayStack) or
-//! [`UiCapturing`](crate::UiCapturing), and auto-dismisses when its timer
-//! elapses. They stack in a single top-anchored column so multiple toasts pile
-//! deterministically rather than overdrawing one another.
+//! [`UiCapturing`](crate::UiCapturing), and auto-dismisses when its timer elapses
+//! (or on tap). They stack in a single column — pinned to the top or bottom edge
+//! per [`Theme::toast_position`](crate::Theme) — so multiple toasts pile
+//! deterministically rather than overdrawing one another. A [`ToastLevel`] picks
+//! the accent border from the theme's semantic colours.
 //!
 //! ```no_run
 //! use bevy::prelude::*;
@@ -10,12 +12,17 @@
 //! use std::time::Duration;
 //!
 //! fn notify(mut commands: Commands) {
-//!     toast(&mut commands, "Saved").duration(Duration::from_secs(2)).push();
+//!     toast(&mut commands, "Saved").push();
+//!     toast(&mut commands, "Upload failed")
+//!         .level(ToastLevel::Error)
+//!         .duration(Duration::from_secs(6))
+//!         .push();
 //! }
 //! ```
 
 use std::time::Duration;
 
+use bevy::picking::prelude::*;
 use bevy::prelude::*;
 
 use crate::theme::Theme;
@@ -25,6 +32,36 @@ pub(crate) const TOAST_Z: i32 = 100_000;
 
 /// Default lifetime when a builder doesn't set one.
 const DEFAULT_DURATION: Duration = Duration::from_secs(4);
+
+/// A toast's severity, which selects its accent border from the [`Theme`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ToastLevel {
+    #[default]
+    Info,
+    Success,
+    Warning,
+    Error,
+}
+
+impl ToastLevel {
+    fn color(self, theme: &Theme) -> Color {
+        match self {
+            ToastLevel::Info => theme.accent,
+            ToastLevel::Success => theme.success,
+            ToastLevel::Warning => theme.warning,
+            ToastLevel::Error => theme.danger,
+        }
+    }
+}
+
+/// Which screen edge toasts stack against. Set on the [`Theme`]; fixed by the
+/// first toast that spawns the shared layer.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ToastPosition {
+    #[default]
+    Top,
+    Bottom,
+}
 
 /// Tags a toast node so [`expire_toasts`] can find it.
 #[derive(Component)]
@@ -49,6 +86,7 @@ pub fn toast<'a, 'w, 's>(
         spec: SpawnToast {
             message: message.into(),
             accent: None,
+            level: ToastLevel::Info,
             duration: DEFAULT_DURATION,
         },
     }
@@ -68,7 +106,14 @@ impl ToastBuilder<'_, '_, '_> {
         self
     }
 
-    /// Override the accent border tint. Defaults to `Theme::accent`.
+    /// Severity, which picks the accent border from the theme. Defaults to
+    /// `Info`. Ignored if [`accent`](Self::accent) is set explicitly.
+    pub fn level(mut self, level: ToastLevel) -> Self {
+        self.spec.level = level;
+        self
+    }
+
+    /// Override the accent border tint outright. Defaults to the `level` colour.
     pub fn accent(mut self, color: Color) -> Self {
         self.spec.accent = Some(color);
         self
@@ -85,6 +130,7 @@ impl ToastBuilder<'_, '_, '_> {
 struct SpawnToast {
     message: String,
     accent: Option<Color>,
+    level: ToastLevel,
     duration: Duration,
 }
 
@@ -92,9 +138,9 @@ impl Command for SpawnToast {
     type Out = ();
     fn apply(self, world: &mut World) {
         let theme = world.resource::<Theme>().clone();
-        let accent = self.accent.unwrap_or(theme.accent);
+        let accent = self.accent.unwrap_or_else(|| self.level.color(&theme));
 
-        let layer = find_or_spawn_layer(world);
+        let layer = find_or_spawn_layer(world, theme.toast_position);
 
         let toast = world
             .spawn((
@@ -108,6 +154,7 @@ impl Command for SpawnToast {
                 },
                 BackgroundColor(theme.ink),
                 BorderColor::all(accent),
+                Pickable::default(),
             ))
             .id();
         let label = world
@@ -123,32 +170,36 @@ impl Command for SpawnToast {
             .id();
         world.entity_mut(toast).add_child(label);
         world.entity_mut(layer).add_child(toast);
+        // Tap to dismiss early.
+        world
+            .entity_mut(toast)
+            .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
+                commands.entity(toast).despawn();
+            });
     }
 }
 
-/// Reuse the existing toast column if one is up, else spawn it. Anchored to the
-/// top-centre and laid out as a column so toasts stack top-to-bottom.
-fn find_or_spawn_layer(world: &mut World) -> Entity {
+/// Reuse the existing toast column if one is up, else spawn it, anchored to the
+/// configured edge and laid out as a centred column with newest toasts last.
+fn find_or_spawn_layer(world: &mut World, position: ToastPosition) -> Entity {
     let mut existing = world.query_filtered::<Entity, With<ToastLayer>>();
     if let Some(layer) = existing.iter(world).next() {
         return layer;
     }
-    world
-        .spawn((
-            ToastLayer,
-            Node {
-                position_type: PositionType::Absolute,
-                top: Val::Px(16.0),
-                left: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(10.0),
-                ..default()
-            },
-            GlobalZIndex(TOAST_Z),
-        ))
-        .id()
+    let mut node = Node {
+        position_type: PositionType::Absolute,
+        left: Val::Px(0.0),
+        width: Val::Percent(100.0),
+        flex_direction: FlexDirection::Column,
+        align_items: AlignItems::Center,
+        row_gap: Val::Px(10.0),
+        ..default()
+    };
+    match position {
+        ToastPosition::Top => node.top = Val::Px(16.0),
+        ToastPosition::Bottom => node.bottom = Val::Px(16.0),
+    }
+    world.spawn((ToastLayer, node, GlobalZIndex(TOAST_Z))).id()
 }
 
 /// Ticks every toast's timer; despawns it (recursively, taking its label) when
@@ -233,5 +284,67 @@ mod tests {
             !app.world().resource::<UiCapturing>().0,
             "a toast must not arm the input gate"
         );
+    }
+
+    fn app_with_modal() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins).add_plugins(ModalPlugin);
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app
+    }
+
+    fn toast_border(app: &mut App) -> BorderColor {
+        let mut query = app
+            .world_mut()
+            .query_filtered::<&BorderColor, With<Toast>>();
+        *query.iter(app.world()).next().expect("a toast spawned")
+    }
+
+    #[test]
+    fn level_picks_the_theme_colour() {
+        let mut app = app_with_modal();
+        app.world_mut()
+            .run_system_once(|mut commands: Commands| {
+                toast(&mut commands, "boom").level(ToastLevel::Error).push();
+            })
+            .unwrap();
+
+        let danger = app.world().resource::<Theme>().danger;
+        assert_eq!(toast_border(&mut app), BorderColor::all(danger));
+    }
+
+    #[test]
+    fn explicit_accent_overrides_level() {
+        let mut app = app_with_modal();
+        app.world_mut()
+            .run_system_once(|mut commands: Commands| {
+                toast(&mut commands, "boom")
+                    .level(ToastLevel::Error)
+                    .accent(Color::WHITE)
+                    .push();
+            })
+            .unwrap();
+
+        assert_eq!(toast_border(&mut app), BorderColor::all(Color::WHITE));
+    }
+
+    #[test]
+    fn bottom_position_anchors_the_layer() {
+        let mut app = app_with_modal();
+        app.insert_resource(Theme {
+            toast_position: ToastPosition::Bottom,
+            ..Default::default()
+        });
+
+        app.world_mut()
+            .run_system_once(|mut commands: Commands| {
+                toast(&mut commands, "hi").push();
+            })
+            .unwrap();
+
+        let mut query = app.world_mut().query_filtered::<&Node, With<ToastLayer>>();
+        let node = query.iter(app.world()).next().expect("a toast layer");
+        assert_eq!(node.bottom, Val::Px(16.0), "anchored to the bottom edge");
+        assert_eq!(node.top, Val::Auto, "not anchored to the top");
     }
 }
