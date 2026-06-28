@@ -165,11 +165,11 @@ impl Command for SpawnToast {
         world.entity_mut(toast).add_child(label);
         world.entity_mut(layer).add_child(toast);
         // Tap to dismiss early.
-        world.entity_mut(toast).observe(
-            move |_: On<Pointer<Click>>, mut commands: Commands| {
+        world
+            .entity_mut(toast)
+            .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
                 commands.entity(toast).despawn();
-            },
-        );
+            });
     }
 }
 
@@ -278,5 +278,67 @@ mod tests {
             !app.world().resource::<UiCapturing>().0,
             "a toast must not arm the input gate"
         );
+    }
+
+    fn app_with_modal() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins).add_plugins(ModalPlugin);
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app
+    }
+
+    fn toast_border(app: &mut App) -> BorderColor {
+        let mut query = app
+            .world_mut()
+            .query_filtered::<&BorderColor, With<Toast>>();
+        *query.iter(app.world()).next().expect("a toast spawned")
+    }
+
+    #[test]
+    fn level_picks_the_theme_colour() {
+        let mut app = app_with_modal();
+        app.world_mut()
+            .run_system_once(|mut commands: Commands| {
+                toast(&mut commands, "boom").level(ToastLevel::Error).push();
+            })
+            .unwrap();
+
+        let danger = app.world().resource::<Theme>().danger;
+        assert_eq!(toast_border(&mut app), BorderColor::all(danger));
+    }
+
+    #[test]
+    fn explicit_accent_overrides_level() {
+        let mut app = app_with_modal();
+        app.world_mut()
+            .run_system_once(|mut commands: Commands| {
+                toast(&mut commands, "boom")
+                    .level(ToastLevel::Error)
+                    .accent(Color::WHITE)
+                    .push();
+            })
+            .unwrap();
+
+        assert_eq!(toast_border(&mut app), BorderColor::all(Color::WHITE));
+    }
+
+    #[test]
+    fn bottom_position_anchors_the_layer() {
+        let mut app = app_with_modal();
+        app.insert_resource(Theme {
+            toast_position: ToastPosition::Bottom,
+            ..Default::default()
+        });
+
+        app.world_mut()
+            .run_system_once(|mut commands: Commands| {
+                toast(&mut commands, "hi").push();
+            })
+            .unwrap();
+
+        let mut query = app.world_mut().query_filtered::<&Node, With<ToastLayer>>();
+        let node = query.iter(app.world()).next().expect("a toast layer");
+        assert_eq!(node.bottom, Val::Px(16.0), "anchored to the bottom edge");
+        assert_eq!(node.top, Val::Auto, "not anchored to the top");
     }
 }
