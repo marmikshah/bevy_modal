@@ -13,6 +13,7 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
 
+use crate::focus::{Focusable, Focused};
 use crate::stack::{Z_BASE, Z_STEP};
 use crate::{ModalPlugin, OverlayCommandsExt, OverlayStack, UiCapturing, overlay};
 
@@ -44,6 +45,36 @@ fn depth(app: &App) -> usize {
 
 fn capturing(app: &App) -> bool {
     app.world().resource::<UiCapturing>().0
+}
+
+/// The focusable buttons of `overlay`, in navigation order.
+fn focusables_of(app: &mut App, overlay: Entity) -> Vec<Entity> {
+    let mut query = app.world_mut().query::<(Entity, &Focusable)>();
+    let mut found: Vec<(usize, Entity)> = query
+        .iter(app.world())
+        .filter(|(_, f)| f.overlay == overlay)
+        .map(|(e, f)| (f.order, e))
+        .collect();
+    found.sort_by_key(|(order, _)| *order);
+    found.into_iter().map(|(_, e)| e).collect()
+}
+
+fn is_focused(app: &App, entity: Entity) -> bool {
+    app.world().get::<Focused>(entity).is_some()
+}
+
+/// Press a key, run the frame that reacts to it, then fully release it. Without
+/// `InputPlugin` nothing manages the input, so we release *and* clear — otherwise
+/// the key stays in `pressed` and a later `press` of the same key never registers
+/// as `just_pressed` again.
+fn tap_key(app: &mut App, key: KeyCode) {
+    app.world_mut()
+        .resource_mut::<ButtonInput<KeyCode>>()
+        .press(key);
+    app.update();
+    let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+    input.release(key);
+    input.clear();
 }
 
 #[test]
@@ -217,6 +248,122 @@ fn z_index_is_deterministic_per_depth() {
             "depth {i} gets the deterministic z floor",
         );
     }
+}
+
+#[test]
+fn opening_focuses_the_first_button() {
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "m")
+                .title("M")
+                .button("A", |_| {})
+                .button("B", |_| {})
+                .push();
+        })
+        .unwrap();
+    app.update(); // maintain_focus sets the initial focus
+
+    let root = app.world().resource::<OverlayStack>().roots[0];
+    let buttons = focusables_of(&mut app, root);
+    assert_eq!(buttons.len(), 2);
+    assert!(
+        is_focused(&app, buttons[0]),
+        "the first button is focused on open"
+    );
+    assert!(!is_focused(&app, buttons[1]));
+}
+
+#[test]
+fn arrows_move_and_wrap_focus() {
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "m")
+                .button("A", |_| {})
+                .button("B", |_| {})
+                .push();
+        })
+        .unwrap();
+    app.update();
+    let root = app.world().resource::<OverlayStack>().roots[0];
+    let buttons = focusables_of(&mut app, root);
+
+    tap_key(&mut app, KeyCode::ArrowDown);
+    assert!(
+        is_focused(&app, buttons[1]),
+        "down moves to the next button"
+    );
+
+    tap_key(&mut app, KeyCode::ArrowDown);
+    assert!(is_focused(&app, buttons[0]), "down wraps to the first");
+
+    tap_key(&mut app, KeyCode::ArrowUp);
+    assert!(is_focused(&app, buttons[1]), "up wraps to the last");
+}
+
+#[test]
+fn enter_activates_the_focused_button() {
+    #[derive(Resource, Default)]
+    struct Hit(bool);
+
+    let mut app = test_app();
+    app.init_resource::<Hit>();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "m")
+                .button("Go", |commands| {
+                    commands.queue(|world: &mut World| world.resource_mut::<Hit>().0 = true);
+                })
+                .push();
+        })
+        .unwrap();
+    app.update(); // focus the button
+
+    tap_key(&mut app, KeyCode::Enter);
+    assert!(
+        app.world().resource::<Hit>().0,
+        "Enter runs the focused button's action"
+    );
+}
+
+#[test]
+fn focus_follows_the_top_overlay() {
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "a").button("a0", |_| {}).push();
+        })
+        .unwrap();
+    app.update();
+    let a = app.world().resource::<OverlayStack>().entity("a").unwrap();
+    let a0 = focusables_of(&mut app, a)[0];
+    assert!(is_focused(&app, a0));
+
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "b").button("b0", |_| {}).push();
+        })
+        .unwrap();
+    app.update();
+    let b = app.world().resource::<OverlayStack>().entity("b").unwrap();
+    let b0 = focusables_of(&mut app, b)[0];
+    assert!(is_focused(&app, b0), "focus moves to the new top overlay");
+    assert!(
+        !is_focused(&app, a0),
+        "the lower overlay's button drops focus"
+    );
+
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            commands.dismiss_overlay("b");
+        })
+        .unwrap();
+    settle(&mut app);
+    assert!(
+        is_focused(&app, a0),
+        "focus returns to the revealed overlay"
+    );
 }
 
 /// Presses Escape, runs the frame that requests the pop, clears the (un-managed)
