@@ -558,6 +558,34 @@ fn scrim_blocks_the_interaction_path() {
 }
 
 #[test]
+fn content_spawns_caller_children_via_command_spawner() {
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "custom")
+                .content(|parent: &mut ChildSpawnerCommands| {
+                    parent.spawn(Node::default());
+                    parent.spawn(Node::default());
+                })
+                .push();
+        })
+        .unwrap();
+    // Content spawns via `Commands` (deferred); a couple of frames flush it.
+    app.update();
+    app.update();
+
+    let mut query = app
+        .world_mut()
+        .query_filtered::<&Children, With<OverlayBody>>();
+    let children = query.iter(app.world()).next().expect("a content body");
+    assert_eq!(
+        children.len(),
+        2,
+        "the caller's content children were spawned"
+    );
+}
+
+#[test]
 fn panel_caps_at_max_width() {
     let mut app = test_app();
     app.world_mut()
