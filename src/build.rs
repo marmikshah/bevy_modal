@@ -8,6 +8,7 @@
 use bevy::picking::prelude::*;
 use bevy::prelude::*;
 
+use crate::focus::{Focusable, Focused};
 use crate::scrim::scrim_bundle;
 use crate::stack::{Overlay, OverlayStack, Z_BASE, Z_STEP, push_root};
 use crate::theme::Theme;
@@ -17,6 +18,18 @@ use crate::transition::{OverlayBody, Transition, request_close};
 /// `&mut Commands` is the full escape hatch — `commands.queue(|w: &mut World|
 /// ..)` reaches any resource or state from inside it.
 type ButtonCb = Box<dyn FnMut(&mut Commands) + Send + Sync>;
+
+/// A button's action, held on the button entity so every input source — a
+/// pointer click or keyboard Enter/Space — runs the one callback through
+/// [`run`](ButtonAction::run).
+#[derive(Component)]
+pub(crate) struct ButtonAction(ButtonCb);
+
+impl ButtonAction {
+    pub(crate) fn run(&mut self, commands: &mut Commands) {
+        (self.0)(commands);
+    }
+}
 
 /// Fills the overlay root with caller-owned children (a bespoke panel + its
 /// content) instead of the built-in title/body/button panel. The escape hatch
@@ -254,7 +267,7 @@ impl Command for SpawnOverlay {
                 world.entity_mut(panel).add_child(label);
             }
 
-            for (text, mut on_click) in self.buttons {
+            for (order, (text, on_click)) in self.buttons.into_iter().enumerate() {
                 let button = world
                     .spawn((
                         Node {
@@ -268,6 +281,11 @@ impl Command for SpawnOverlay {
                         BackgroundColor(accent.with_alpha(theme.btn_fill_rest)),
                         BorderColor::all(accent.with_alpha(theme.btn_border_rest)),
                         ModalButtonStyle { accent },
+                        ButtonAction(on_click),
+                        Focusable {
+                            overlay: root,
+                            order,
+                        },
                     ))
                     .id();
                 let label = world
@@ -283,9 +301,15 @@ impl Command for SpawnOverlay {
                     .id();
                 world.entity_mut(button).add_child(label);
                 world.entity_mut(panel).add_child(button);
+                // A pointer click runs the same stored action as keyboard/gamepad
+                // activation; capture the button so a click on its label still hits it.
                 world.entity_mut(button).observe(
-                    move |_: On<Pointer<Click>>, mut commands: Commands| {
-                        on_click(&mut commands);
+                    move |_: On<Pointer<Click>>,
+                          mut actions: Query<&mut ButtonAction>,
+                          mut commands: Commands| {
+                        if let Ok(mut action) = actions.get_mut(button) {
+                            action.run(&mut commands);
+                        }
                     },
                 );
             }
@@ -303,27 +327,31 @@ impl Command for SpawnOverlay {
     }
 }
 
-/// Hover/press feedback, theme-driven. Edge-triggered, so it costs nothing
-/// while the pointer is still.
+/// Hover/press/focus feedback, theme-driven. A keyboard- or gamepad-focused
+/// button gets the hover look so the selection is visible without a pointer.
+/// Runs every frame (focus is a separate component from `Interaction`) but only
+/// writes when the target colour actually changes, so it stays cheap.
 pub(crate) fn react_buttons(
     theme: Res<Theme>,
-    mut buttons: Query<
-        (
-            &Interaction,
-            &ModalButtonStyle,
-            &mut BackgroundColor,
-            &mut BorderColor,
-        ),
-        Changed<Interaction>,
-    >,
+    mut buttons: Query<(
+        &Interaction,
+        Has<Focused>,
+        &ModalButtonStyle,
+        &mut BackgroundColor,
+        &mut BorderColor,
+    )>,
 ) {
-    for (interaction, style, mut bg, mut border) in buttons.iter_mut() {
+    for (interaction, focused, style, mut bg, mut border) in buttons.iter_mut() {
         let (fill, line) = match interaction {
             Interaction::Pressed => (theme.btn_fill_press, theme.btn_border_hover),
             Interaction::Hovered => (theme.btn_fill_hover, theme.btn_border_hover),
+            Interaction::None if focused => (theme.btn_fill_hover, theme.btn_border_hover),
             Interaction::None => (theme.btn_fill_rest, theme.btn_border_rest),
         };
-        bg.0 = style.accent.with_alpha(fill);
-        *border = BorderColor::all(style.accent.with_alpha(line));
+        let new_bg = style.accent.with_alpha(fill);
+        if bg.0 != new_bg {
+            bg.0 = new_bg;
+            *border = BorderColor::all(style.accent.with_alpha(line));
+        }
     }
 }

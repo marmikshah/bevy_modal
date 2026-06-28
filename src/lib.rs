@@ -41,6 +41,7 @@ use bevy::prelude::*;
 
 mod build;
 mod confirm;
+mod focus;
 mod gate;
 mod scrim;
 mod stack;
@@ -65,10 +66,10 @@ pub mod prelude {
     };
 }
 
-/// Wires the overlay stack, the open/close transitions, the input-capture gate,
-/// the toast expiry sweep and the button feedback systems. Insert your own
-/// [`Theme`] before or after — a neutral default is registered here so examples
-/// run with zero setup.
+/// Wires the overlay stack, the open/close transitions, focus + keyboard
+/// navigation, the input-capture gate, the toast expiry sweep and the button
+/// feedback systems. Insert your own [`Theme`] before or after — a neutral
+/// default is registered here so examples run with zero setup.
 pub struct ModalPlugin;
 
 impl Plugin for ModalPlugin {
@@ -82,6 +83,15 @@ impl Plugin for ModalPlugin {
                     transition::drive_transitions,
                     stack::prune_despawned_overlays,
                     stack::escape_pops_top,
+                    // Focus systems run in order so the per-frame focus decision
+                    // is deterministic (maintain default → hover → navigate → activate).
+                    (
+                        focus::maintain_focus,
+                        focus::hover_focuses,
+                        focus::navigate_focus,
+                        focus::activate_focused,
+                    )
+                        .chain(),
                     build::react_buttons,
                     toast::expire_toasts,
                 ),
