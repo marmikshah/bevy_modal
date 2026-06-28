@@ -16,7 +16,12 @@ use bevy::time::TimeUpdateStrategy;
 use crate::events::{CloseReason, OverlayClosed, OverlayOpened};
 use crate::focus::{Focusable, Focused};
 use crate::stack::{Z_BASE, Z_STEP};
-use crate::{ModalPlugin, OverlayCommandsExt, OverlayStack, UiCapturing, overlay};
+use crate::toast::ToastLayer;
+use crate::transition::OverlayBody;
+use crate::{
+    ModalPlugin, OverlayCommandsExt, OverlayStack, SafeAreaInsets, Theme, UiCapturing, overlay,
+    toast,
+};
 
 /// A headless app with the plugin wired, a keyboard resource (which
 /// `MinimalPlugins` omits but `escape_pops_top` reads), and a fixed 200ms manual
@@ -472,6 +477,69 @@ fn direct_despawn_emits_closed_with_despawned_reason() {
         event_log(&app).closed,
         vec![("a".to_string(), CloseReason::Despawned)]
     );
+}
+
+#[test]
+fn panel_caps_at_max_width() {
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "m")
+                .title("M")
+                .button("Ok", |_| {})
+                .push();
+        })
+        .unwrap();
+    app.update();
+
+    let max = app.world().resource::<Theme>().panel_max_width;
+    let mut query = app.world_mut().query_filtered::<&Node, With<OverlayBody>>();
+    let panel = query.iter(app.world()).next().expect("a built-in panel");
+    assert_eq!(panel.width, Val::Percent(82.0));
+    assert_eq!(panel.max_width, Val::Px(max), "panel width is capped");
+}
+
+#[test]
+fn safe_area_pads_the_overlay_root() {
+    let mut app = test_app();
+    app.insert_resource(SafeAreaInsets {
+        top: 50.0,
+        bottom: 30.0,
+        left: 10.0,
+        right: 10.0,
+    });
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "m").push();
+        })
+        .unwrap();
+    app.update();
+
+    let root = app.world().resource::<OverlayStack>().roots[0];
+    let node = app.world().get::<Node>(root).expect("root node");
+    assert_eq!(node.padding.top, Val::Px(50.0));
+    assert_eq!(node.padding.bottom, Val::Px(30.0));
+    assert_eq!(node.padding.left, Val::Px(10.0));
+}
+
+#[test]
+fn safe_area_offsets_the_toast_layer() {
+    let mut app = test_app();
+    app.insert_resource(SafeAreaInsets {
+        top: 50.0,
+        ..Default::default()
+    });
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            toast(&mut commands, "hi").push();
+        })
+        .unwrap();
+    app.update();
+
+    let mut query = app.world_mut().query_filtered::<&Node, With<ToastLayer>>();
+    let node = query.iter(app.world()).next().expect("a toast layer");
+    // Default top position: 16px margin + 50px inset.
+    assert_eq!(node.top, Val::Px(66.0));
 }
 
 /// Presses Escape, runs the frame that requests the pop, clears the (un-managed)

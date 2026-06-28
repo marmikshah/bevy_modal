@@ -226,6 +226,7 @@ impl Command for SpawnOverlay {
                     UiTransform::from_scale(Vec2::splat(scale_from)),
                     Node {
                         width: Val::Percent(82.0),
+                        max_width: Val::Px(theme.panel_max_width),
                         flex_direction: FlexDirection::Column,
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,

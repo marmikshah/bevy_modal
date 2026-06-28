@@ -46,6 +46,9 @@ pub struct Theme {
     pub panel_scale_from: f32,
     /// Which edge toasts stack against.
     pub toast_position: ToastPosition,
+    /// Cap on the built-in panel's width, so it doesn't stretch absurdly wide on
+    /// tablets/desktop. The panel is `82%` of the screen, clamped to this.
+    pub panel_max_width: f32,
 }
 
 impl Default for Theme {
@@ -73,6 +76,7 @@ impl Default for Theme {
             close_secs: 0.12,
             panel_scale_from: 0.92,
             toast_position: ToastPosition::Top,
+            panel_max_width: 420.0,
         }
     }
 }
