@@ -1,8 +1,10 @@
 //! Toasts — transient, non-blocking notifications. Unlike an overlay, a toast
 //! draws no scrim, never touches [`OverlayStack`](crate::OverlayStack) or
-//! [`UiCapturing`](crate::UiCapturing), and auto-dismisses when its timer
-//! elapses. They stack in a single top-anchored column so multiple toasts pile
-//! deterministically rather than overdrawing one another.
+//! [`UiCapturing`](crate::UiCapturing), and auto-dismisses when its timer elapses
+//! (or on tap). They stack in a single column — pinned to the top or bottom edge
+//! per [`Theme::toast_position`](crate::Theme) — so multiple toasts pile
+//! deterministically rather than overdrawing one another. A [`ToastLevel`] picks
+//! the accent border from the theme's semantic colours.
 //!
 //! ```no_run
 //! use bevy::prelude::*;
@@ -10,7 +12,11 @@
 //! use std::time::Duration;
 //!
 //! fn notify(mut commands: Commands) {
-//!     toast(&mut commands, "Saved").duration(Duration::from_secs(2)).push();
+//!     toast(&mut commands, "Saved").push();
+//!     toast(&mut commands, "Upload failed")
+//!         .level(ToastLevel::Error)
+//!         .duration(Duration::from_secs(6))
+//!         .push();
 //! }
 //! ```
 
