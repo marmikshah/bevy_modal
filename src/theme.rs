@@ -30,6 +30,13 @@ pub struct Theme {
     pub btn_fill_press: f32,
     pub btn_border_rest: f32,
     pub btn_border_hover: f32,
+    /// Seconds to ease an overlay in (scrim fade + panel scale).
+    pub open_secs: f32,
+    /// Seconds to ease an overlay out before it despawns.
+    pub close_secs: f32,
+    /// Panel/content scale at the start of the open (and end of the close); eases
+    /// to 1.0. Slightly under 1 gives a subtle "pop". Set to 1.0 for fade-only.
+    pub panel_scale_from: f32,
 }
 
 impl Default for Theme {
@@ -50,6 +57,9 @@ impl Default for Theme {
             btn_fill_press: 0.34,
             btn_border_rest: 0.65,
             btn_border_hover: 1.0,
+            open_secs: 0.18,
+            close_secs: 0.12,
+            panel_scale_from: 0.92,
         }
     }
 }

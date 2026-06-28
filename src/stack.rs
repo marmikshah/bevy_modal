@@ -5,6 +5,7 @@
 use bevy::prelude::*;
 
 use crate::gate::UiCapturing;
+use crate::transition::request_close;
 
 /// The `GlobalZIndex` floor for overlays; each depth adds [`Z_STEP`]. Pick a
 /// base well above ordinary HUD z so overlays always win.
@@ -118,7 +119,7 @@ pub(crate) fn escape_pops_top(
         && let Ok(overlay) = overlays.get(top)
         && overlay.pop_on_escape
     {
-        commands.entity(top).despawn();
+        commands.queue(move |world: &mut World| request_close(world, top));
     }
 }
 
@@ -136,7 +137,7 @@ impl OverlayCommandsExt for Commands<'_, '_> {
         let id = id.into();
         self.queue(move |world: &mut World| {
             if let Some(e) = world.resource::<OverlayStack>().entity(&id) {
-                world.entity_mut(e).despawn();
+                request_close(world, e);
             }
         });
     }

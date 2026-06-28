@@ -46,6 +46,7 @@ mod scrim;
 mod stack;
 mod theme;
 mod toast;
+mod transition;
 
 #[cfg(test)]
 mod tests;
@@ -64,9 +65,10 @@ pub mod prelude {
     };
 }
 
-/// Wires the overlay stack, the input-capture gate, the toast expiry sweep and
-/// the button feedback systems. Insert your own [`Theme`] before or after — a
-/// neutral default is registered here so examples run with zero setup.
+/// Wires the overlay stack, the open/close transitions, the input-capture gate,
+/// the toast expiry sweep and the button feedback systems. Insert your own
+/// [`Theme`] before or after — a neutral default is registered here so examples
+/// run with zero setup.
 pub struct ModalPlugin;
 
 impl Plugin for ModalPlugin {
@@ -77,6 +79,7 @@ impl Plugin for ModalPlugin {
             .add_systems(
                 Update,
                 (
+                    transition::drive_transitions,
                     stack::prune_despawned_overlays,
                     stack::escape_pops_top,
                     build::react_buttons,
