@@ -276,6 +276,25 @@ pub(crate) fn expire_toasts(
     }
 }
 
+/// Cap the visible toast count, dismissing the oldest first. The layer's children
+/// are in spawn order, so the front of the list is the oldest.
+pub(crate) fn cap_toasts(
+    theme: Res<Theme>,
+    layers: Query<&Children, With<ToastLayer>>,
+    mut commands: Commands,
+) {
+    if theme.max_toasts == 0 {
+        return;
+    }
+    for children in &layers {
+        if children.len() > theme.max_toasts {
+            for &old in &children[..children.len() - theme.max_toasts] {
+                commands.entity(old).despawn();
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
