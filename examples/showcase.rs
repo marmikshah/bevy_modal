@@ -147,42 +147,13 @@ fn on_press(buttons: Query<(&Interaction, &Action), Changed<Interaction>>, mut c
                     })
                     .push();
             }
-            // The `.content()` escape hatch: caller-owned children under the
-            // (still scrimmed, stacked, gated, animated) root.
+            // The `.content()` escape hatch hosting a *reusable* builder
+            // (`bespoke_panel`, typed `&mut ChildSpawnerCommands`) under the still
+            // scrimmed/stacked/gated/animated root — the standard idiom drops in.
             Action::CustomContent => {
                 overlay(&mut commands, "custom")
                     .dismissable(true)
-                    .content(|parent| {
-                        parent
-                            .spawn((
-                                Node {
-                                    flex_direction: FlexDirection::Column,
-                                    align_items: AlignItems::Center,
-                                    row_gap: Val::Px(10.0),
-                                    padding: UiRect::all(Val::Px(28.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(Color::srgb(0.05, 0.07, 0.12)),
-                            ))
-                            .with_children(|panel| {
-                                panel.spawn((
-                                    Text::new("Bespoke panel"),
-                                    TextFont {
-                                        font_size: FontSize::Px(24.0),
-                                        ..default()
-                                    },
-                                    TextColor(Color::srgb(0.6, 0.9, 0.7)),
-                                ));
-                                panel.spawn((
-                                    Text::new("Tap the scrim to close."),
-                                    TextFont {
-                                        font_size: FontSize::Px(16.0),
-                                        ..default()
-                                    },
-                                    TextColor(Color::srgb(0.7, 0.7, 0.8)),
-                                ));
-                            });
-                    })
+                    .content(bespoke_panel)
                     .push_unique();
             }
             Action::ToastInfo => {
@@ -213,6 +184,41 @@ fn on_press(buttons: Query<(&Interaction, &Action), Changed<Interaction>>, mut c
             }
         }
     }
+}
+
+/// A reusable `bevy_ui` builder typed for `&mut ChildSpawnerCommands` — the kind
+/// of helper a real app already has. It drops straight into `.content()` (the
+/// point of #13): the standard `spawn().with_children` idiom, no re-authoring.
+fn bespoke_panel(parent: &mut ChildSpawnerCommands) {
+    parent
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(10.0),
+                padding: UiRect::all(Val::Px(28.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.05, 0.07, 0.12)),
+        ))
+        .with_children(|card| {
+            card.spawn((
+                Text::new("Bespoke panel"),
+                TextFont {
+                    font_size: FontSize::Px(24.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.6, 0.9, 0.7)),
+            ));
+            card.spawn((
+                Text::new("A reused ChildSpawnerCommands helper. Tap the scrim to close."),
+                TextFont {
+                    font_size: FontSize::Px(16.0),
+                    ..default()
+                },
+                TextColor(Color::srgb(0.7, 0.7, 0.8)),
+            ));
+        });
 }
 
 /// Lifecycle messages surfaced as toasts, so opening/closing is visible.
