@@ -73,9 +73,9 @@ pub mod prelude {
 
 /// Wires the overlay stack, the open/close transitions, focus + keyboard
 /// navigation, lifecycle messages ([`OverlayOpened`] / [`OverlayClosed`]), the
-/// input-capture gate, the toast expiry sweep and the button feedback systems.
-/// Insert your own [`Theme`] before or after — a neutral default is registered
-/// here so examples run with zero setup.
+/// input-capture gate, [`SafeAreaInsets`] application, the toast expiry sweep and
+/// the button feedback systems. Insert your own [`Theme`] before or after — a
+/// neutral default is registered here so examples run with zero setup.
 pub struct ModalPlugin;
 
 impl Plugin for ModalPlugin {

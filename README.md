@@ -170,6 +170,24 @@ fn react(mut opened: MessageReader<OverlayOpened>, mut closed: MessageReader<Ove
 
 `OverlayClosed` fires for *every* close path, tagged with a `CloseReason`.
 
+## Safe area & sizing
+
+For mobile, set the `SafeAreaInsets` resource (it's generic — populate it from
+your platform's notch / home-indicator insets; the crate has no platform
+dependency). Overlay roots get the insets as padding (centred panels and
+full-bleed `.content()` both stay inside the safe area) and the toast column
+offsets its anchored edge to match — updated every frame, so rotation is handled:
+
+```rust
+fn sync_insets(mut insets: ResMut<SafeAreaInsets>) {
+    insets.top = /* your platform's top inset */ 47.0;
+    insets.bottom = 34.0;
+}
+```
+
+The built-in panel is `82%` of the screen, clamped to `Theme::panel_max_width`
+(420px default), so it doesn't stretch absurdly wide on tablets/desktop.
+
 ## Compatibility
 
 | `bevy_modal` | `bevy` |
