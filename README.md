@@ -136,7 +136,7 @@ game's chrome. Toasts reuse the same palette (`ink` fill, `accent` border).
 
 | `bevy_modal` | `bevy` |
 |--------------|--------|
-| 0.1          | 0.18   |
+| 0.1          | 0.19   |
 
 Pre-release: consume via a path dependency (`bevy_modal = { path = "../bevy_modal" }`)
 and dogfood before this hits crates.io.
@@ -186,6 +186,14 @@ cargo test
   addition.
 - Built-in panel is intentionally minimal (title / body / buttons). Richer
   layouts go through `.content()` — by design, not omission.
+
+## Authorship
+
+Much of this project — the Rust crate, its tests, and these docs — was written by
+**Claude Opus 4.8** (Anthropic) under human direction and review. It ships with a
+passing test suite and a runnable example, but it's young (0.x): read the code,
+run your own tests, and validate behavior in your app before relying on it in
+production. Bug reports and PRs welcome.
 
 ## License
 

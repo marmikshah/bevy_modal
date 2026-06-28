@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn is_open_and_entity_track_roots() {
-        // Two distinct real entities (Entity has no public constructor in 0.18).
+        // Two distinct real entities (Entity has no public constructor).
         let mut world = World::new();
         let a = world.spawn_empty().id();
         let b = world.spawn_empty().id();
