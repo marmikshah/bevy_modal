@@ -39,8 +39,10 @@ id or sibling position.
 - **Pruning is removal-driven**: despawn an overlay root (recursive — scrim and
   content go with it) and a system reconciles the stack and the input gate.
 - **Toasts** are *not* modal: they draw no scrim, never touch `OverlayStack` or
-  `UiCapturing`, sit in a top-anchored column, and auto-despawn when their timer
-  elapses. They float above overlays.
+  `UiCapturing`, sit in a column pinned to either screen edge, and auto-despawn
+  when their timer elapses. They float above overlays.
+- **Overlays animate** in and out, support keyboard focus navigation, and emit
+  `OverlayOpened` / `OverlayClosed` lifecycle messages — see the sections below.
 - **`confirm()`** is a thin wrapper over `overlay()` — same scrim/stack/gate, two
   buttons that run a callback and then dismiss the dialog.
 
@@ -108,14 +110,16 @@ fn ask(mut commands: Commands) {
 
 | Item | What it does |
 |------|--------------|
-| `ModalPlugin` | Wires the stack, gate, toast expiry and button feedback; registers a default `Theme`. |
+| `ModalPlugin` | Wires the stack, transitions, focus/keyboard nav, lifecycle messages, the input gate, safe-area, toasts and button feedback; registers a default `Theme`. |
 | `overlay(c, id)` | Builder for a modal overlay (`title`/`body`/`button`/`content`/`dismissable`/`escape`/`accent`). `push()` / `push_unique()`. |
 | `confirm(c, id, title)` | Two-button dialog (`message`/`confirm_label`/`cancel_label`/`on_confirm`/`on_cancel`/`accent`). `push()`. |
-| `toast(c, msg)` | Transient notification (`duration`/`accent`). `push()`. |
+| `toast(c, msg)` | Transient notification (`level`/`duration`/`accent`/`action`). `push()`. |
+| `OverlayOpened` / `OverlayClosed` | Lifecycle messages; `OverlayClosed` carries a `CloseReason`. |
+| `SafeAreaInsets` | Resource for notch/home-indicator insets — pads overlays, offsets toasts. |
 | `OverlayStack` | Live stack of open overlays; `is_open`/`entity`/`top`/`depth`. |
 | `OverlayCommandsExt::dismiss_overlay(id)` | Despawn the open overlay with this id. |
 | `UiCapturing` / `ui_not_capturing` | The input gate resource + run condition. |
-| `Theme` | Injected colours, fonts, borders, button-state alphas. |
+| `Theme` | Injected colours (incl. semantic + scrim), fonts, borders, transition timing, toast position, sizing. |
 
 ## The input-gate contract (read this)
 

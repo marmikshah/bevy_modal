@@ -6,8 +6,9 @@ Agent onboarding. `make` is the entry point; keep this short and current.
 
 A modal/overlay stack over native `bevy_ui`: a blocking scrim, deterministic
 layering, an input-capture gate, and an ergonomic `overlay()` builder — plus
-transient toasts and a confirm dialog. No retained widget framework, no layout
-engine; it emits plain `bevy_ui` nodes.
+open/close transitions, keyboard focus navigation, lifecycle messages, safe-area
+awareness, transient toasts and a confirm dialog. No retained widget framework,
+no layout engine; it emits plain `bevy_ui` nodes.
 
 ## Entry point
 
@@ -26,8 +27,12 @@ engine; it emits plain `bevy_ui` nodes.
 - `stack.rs` — the `OverlayStack` (spawn-order layering), prune-on-despawn, escape-pop, `dismiss_overlay`.
 - `scrim.rs` — the full-screen pickable scrim (the UI→UI occlusion plane).
 - `gate.rs` — `UiCapturing` + the `ui_not_capturing` run condition (the UI→gameplay plane).
-- `build.rs` — the `overlay()` builder and themed button feedback.
-- `toast.rs` / `confirm.rs` — transient toasts and the confirm-dialog convenience.
+- `build.rs` — the `overlay()` builder, the `ButtonAction` component, and themed button feedback.
+- `transition.rs` — open/close animation + the overlay lifecycle (`Opening → Open → Closing → despawn`); `request_close` is the animated close path, a direct `despawn()` is instant.
+- `focus.rs` — focus + keyboard navigation (Tab/arrows/Enter) over overlay buttons; top-overlay only.
+- `events.rs` — `OverlayOpened` / `OverlayClosed` lifecycle messages (with `CloseReason`).
+- `safe_area.rs` — `SafeAreaInsets` applied as overlay padding + toast edge offset.
+- `toast.rs` / `confirm.rs` — transient toasts (levels/position/action/cap) and the confirm-dialog convenience.
 - `theme.rs` — the injected `Theme`.
 
 ## Hard constraints
