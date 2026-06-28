@@ -24,5 +24,6 @@ bevy = { version = "0.19", default-features = false, features = [
 [dev-dependencies]
 bevy = { version = "0.19", default-features = false, features = [
     "2d",
+    "bevy_ui_render", # actually draw the UI — examples are blank without it
     "default_font",
 ] }
