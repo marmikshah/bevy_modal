@@ -11,6 +11,7 @@ use bevy::prelude::*;
 use crate::scrim::scrim_bundle;
 use crate::stack::{Overlay, OverlayStack, Z_BASE, Z_STEP, push_root};
 use crate::theme::Theme;
+use crate::transition::{OverlayBody, Transition, request_close};
 
 /// A button's click handler. Boxed `FnMut` so the builder stays non-generic;
 /// `&mut Commands` is the full escape hatch — `commands.queue(|w: &mut World|
@@ -175,105 +176,130 @@ impl Command for SpawnOverlay {
             .entity_mut(root)
             .insert(GlobalZIndex(Z_BASE + depth as i32 * Z_STEP));
 
-        let scrim = world.spawn(scrim_bundle(theme.scrim)).id();
+        // Scrim starts transparent; the transition eases its alpha up to
+        // `theme.scrim`. Tapping it (when dismissable) eases the overlay out.
+        let scrim = world.spawn(scrim_bundle(theme.scrim.with_alpha(0.0))).id();
         world.entity_mut(root).add_child(scrim);
         if self.dismissable {
             world.entity_mut(scrim).observe(
                 move |_: On<Pointer<Click>>, mut commands: Commands| {
-                    commands.entity(root).despawn();
+                    commands.queue(move |world: &mut World| request_close(world, root));
                 },
             );
         }
 
-        // Bespoke content owns the whole root; the built-in panel is skipped.
-        if let Some(content) = self.content {
-            world.entity_mut(root).with_children(content);
-            return;
-        }
+        let scale_from = theme.panel_scale_from;
 
-        let panel = world
-            .spawn((
-                Node {
-                    width: Val::Percent(82.0),
-                    flex_direction: FlexDirection::Column,
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px(16.0),
-                    padding: UiRect::axes(Val::Px(16.0), Val::Px(24.0)),
-                    border: UiRect::all(Val::Px(theme.panel_border)),
-                    ..default()
-                },
-                BackgroundColor(theme.ink),
-                BorderColor::all(theme.line),
-            ))
-            .id();
-        world.entity_mut(root).add_child(panel);
-
-        if let Some(title) = self.title {
-            let label = world
+        // The foreground node — built-in panel or content wrapper. The transition
+        // scales *this* (never the root), so the full-screen scrim stays put.
+        let body = if let Some(content) = self.content {
+            let body = world
                 .spawn((
-                    Text::new(title),
-                    TextFont {
-                        font: theme.display.clone().into(),
-                        font_size: FontSize::Px(28.0),
-                        ..default()
-                    },
-                    TextColor(accent),
+                    OverlayBody,
+                    UiTransform::from_scale(Vec2::splat(scale_from)),
+                    Node::default(),
                 ))
                 .id();
-            world.entity_mut(panel).add_child(label);
-        }
-
-        for line in self.body {
-            let label = world
+            world.entity_mut(root).add_child(body);
+            world.entity_mut(body).with_children(content);
+            body
+        } else {
+            let panel = world
                 .spawn((
-                    Text::new(line),
-                    TextFont {
-                        font: theme.body.clone().into(),
-                        font_size: FontSize::Px(22.0),
-                        ..default()
-                    },
-                    TextColor(theme.text_dim),
-                ))
-                .id();
-            world.entity_mut(panel).add_child(label);
-        }
-
-        for (text, mut on_click) in self.buttons {
-            let button = world
-                .spawn((
+                    OverlayBody,
+                    UiTransform::from_scale(Vec2::splat(scale_from)),
                     Node {
+                        width: Val::Percent(82.0),
+                        flex_direction: FlexDirection::Column,
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
-                        padding: UiRect::axes(Val::Px(18.0), Val::Px(8.0)),
-                        border: UiRect::all(Val::Px(theme.button_border)),
+                        row_gap: Val::Px(16.0),
+                        padding: UiRect::axes(Val::Px(16.0), Val::Px(24.0)),
+                        border: UiRect::all(Val::Px(theme.panel_border)),
                         ..default()
                     },
-                    Button,
-                    BackgroundColor(accent.with_alpha(theme.btn_fill_rest)),
-                    BorderColor::all(accent.with_alpha(theme.btn_border_rest)),
-                    ModalButtonStyle { accent },
+                    BackgroundColor(theme.ink),
+                    BorderColor::all(theme.line),
                 ))
                 .id();
-            let label = world
-                .spawn((
-                    Text::new(text),
-                    TextFont {
-                        font: theme.body.clone().into(),
-                        font_size: FontSize::Px(24.0),
-                        ..default()
+            world.entity_mut(root).add_child(panel);
+
+            if let Some(title) = self.title {
+                let label = world
+                    .spawn((
+                        Text::new(title),
+                        TextFont {
+                            font: theme.display.clone().into(),
+                            font_size: FontSize::Px(28.0),
+                            ..default()
+                        },
+                        TextColor(accent),
+                    ))
+                    .id();
+                world.entity_mut(panel).add_child(label);
+            }
+
+            for line in self.body {
+                let label = world
+                    .spawn((
+                        Text::new(line),
+                        TextFont {
+                            font: theme.body.clone().into(),
+                            font_size: FontSize::Px(22.0),
+                            ..default()
+                        },
+                        TextColor(theme.text_dim),
+                    ))
+                    .id();
+                world.entity_mut(panel).add_child(label);
+            }
+
+            for (text, mut on_click) in self.buttons {
+                let button = world
+                    .spawn((
+                        Node {
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            padding: UiRect::axes(Val::Px(18.0), Val::Px(8.0)),
+                            border: UiRect::all(Val::Px(theme.button_border)),
+                            ..default()
+                        },
+                        Button,
+                        BackgroundColor(accent.with_alpha(theme.btn_fill_rest)),
+                        BorderColor::all(accent.with_alpha(theme.btn_border_rest)),
+                        ModalButtonStyle { accent },
+                    ))
+                    .id();
+                let label = world
+                    .spawn((
+                        Text::new(text),
+                        TextFont {
+                            font: theme.body.clone().into(),
+                            font_size: FontSize::Px(24.0),
+                            ..default()
+                        },
+                        TextColor(theme.text),
+                    ))
+                    .id();
+                world.entity_mut(button).add_child(label);
+                world.entity_mut(panel).add_child(button);
+                world.entity_mut(button).observe(
+                    move |_: On<Pointer<Click>>, mut commands: Commands| {
+                        on_click(&mut commands);
                     },
-                    TextColor(theme.text),
-                ))
-                .id();
-            world.entity_mut(button).add_child(label);
-            world.entity_mut(panel).add_child(button);
-            world.entity_mut(button).observe(
-                move |_: On<Pointer<Click>>, mut commands: Commands| {
-                    on_click(&mut commands);
-                },
-            );
-        }
+                );
+            }
+            panel
+        };
+
+        world.entity_mut(root).insert(Transition::opening(
+            scrim,
+            theme.scrim,
+            body,
+            theme.open_secs,
+            theme.close_secs,
+            scale_from,
+        ));
     }
 }
 

@@ -128,9 +128,20 @@ Toasts are deliberately outside this contract: they never set `UiCapturing`.
 ## Theming
 
 Everything is driven by an injected `Theme` resource (colours, fonts, border
-widths, button-state alphas). A neutral dark default is registered by
-`ModalPlugin` so examples run with zero setup; insert your own to match your
-game's chrome. Toasts reuse the same palette (`ink` fill, `accent` border).
+widths, button-state alphas, and the transition timing below). A neutral dark
+default is registered by `ModalPlugin` so examples run with zero setup; insert
+your own to match your game's chrome. Toasts reuse the same palette (`ink` fill,
+`accent` border).
+
+## Transitions
+
+Overlays ease **in** when opened and **out** when dismissed, instead of popping —
+the scrim fades and the panel scales (`Theme::open_secs` / `close_secs` /
+`panel_scale_from`; set `panel_scale_from = 1.0` for fade-only, or the durations
+to `0.0` for instant). Dismissal via the API — `dismiss_overlay`, Escape, or a
+scrim tap — plays the exit, then despawns. A **direct `despawn()`** (e.g. a state
+machine on `OnExit`) still closes instantly. The input gate stays armed until the
+overlay is fully gone, so input never leaks under a still-visible modal.
 
 ## Compatibility
 
