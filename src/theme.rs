@@ -19,6 +19,11 @@ pub struct Theme {
     pub scrim: Color,
     /// Default accent when a builder call doesn't specify one.
     pub accent: Color,
+    /// Semantic accents, selected by [`ToastLevel`](crate::ToastLevel) (and free
+    /// for your own UI). `Info` uses [`accent`](Self::accent).
+    pub success: Color,
+    pub warning: Color,
+    pub danger: Color,
     /// Display face (titles).
     pub display: Handle<Font>,
     /// Body face (labels, buttons, toasts).
@@ -48,6 +53,9 @@ impl Default for Theme {
             text_dim: Color::srgb(0.55, 0.60, 0.78),
             scrim: Color::srgba(0.0, 0.0, 0.0, 0.6),
             accent: Color::srgb(0.45, 0.70, 1.0),
+            success: Color::srgb(0.40, 0.80, 0.55),
+            warning: Color::srgb(0.95, 0.75, 0.35),
+            danger: Color::srgb(0.95, 0.45, 0.45),
             display: Handle::default(),
             body: Handle::default(),
             panel_border: 3.0,

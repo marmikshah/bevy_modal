@@ -26,6 +26,27 @@ pub(crate) const TOAST_Z: i32 = 100_000;
 /// Default lifetime when a builder doesn't set one.
 const DEFAULT_DURATION: Duration = Duration::from_secs(4);
 
+/// A toast's severity, which selects its accent border from the [`Theme`].
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ToastLevel {
+    #[default]
+    Info,
+    Success,
+    Warning,
+    Error,
+}
+
+impl ToastLevel {
+    fn color(self, theme: &Theme) -> Color {
+        match self {
+            ToastLevel::Info => theme.accent,
+            ToastLevel::Success => theme.success,
+            ToastLevel::Warning => theme.warning,
+            ToastLevel::Error => theme.danger,
+        }
+    }
+}
+
 /// Tags a toast node so [`expire_toasts`] can find it.
 #[derive(Component)]
 pub(crate) struct Toast;
@@ -49,6 +70,7 @@ pub fn toast<'a, 'w, 's>(
         spec: SpawnToast {
             message: message.into(),
             accent: None,
+            level: ToastLevel::Info,
             duration: DEFAULT_DURATION,
         },
     }
@@ -68,7 +90,14 @@ impl ToastBuilder<'_, '_, '_> {
         self
     }
 
-    /// Override the accent border tint. Defaults to `Theme::accent`.
+    /// Severity, which picks the accent border from the theme. Defaults to
+    /// `Info`. Ignored if [`accent`](Self::accent) is set explicitly.
+    pub fn level(mut self, level: ToastLevel) -> Self {
+        self.spec.level = level;
+        self
+    }
+
+    /// Override the accent border tint outright. Defaults to the `level` colour.
     pub fn accent(mut self, color: Color) -> Self {
         self.spec.accent = Some(color);
         self
@@ -85,6 +114,7 @@ impl ToastBuilder<'_, '_, '_> {
 struct SpawnToast {
     message: String,
     accent: Option<Color>,
+    level: ToastLevel,
     duration: Duration,
 }
 
@@ -92,7 +122,7 @@ impl Command for SpawnToast {
     type Out = ();
     fn apply(self, world: &mut World) {
         let theme = world.resource::<Theme>().clone();
-        let accent = self.accent.unwrap_or(theme.accent);
+        let accent = self.accent.unwrap_or_else(|| self.level.color(&theme));
 
         let layer = find_or_spawn_layer(world);
 
