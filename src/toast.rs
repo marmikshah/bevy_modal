@@ -232,10 +232,12 @@ impl Command for SpawnToast {
         }
 
         // Tap to dismiss early (also fires for a bubbled action-button click).
+        // `try_despawn`: a tap can race the timer expiry or the cap on the same
+        // frame, so this despawn may find the toast already gone — no warning.
         world
             .entity_mut(toast)
             .observe(move |_: On<Pointer<Click>>, mut commands: Commands| {
-                commands.entity(toast).despawn();
+                commands.entity(toast).try_despawn();
             });
     }
 }
@@ -273,7 +275,9 @@ pub(crate) fn expire_toasts(
 ) {
     for (entity, mut timer) in toasts.iter_mut() {
         if timer.0.tick(time.delta()).just_finished() {
-            commands.entity(entity).despawn();
+            // May race a tap-dismiss or the cap on this frame; tolerate a gone
+            // entity rather than log `entity does not exist`.
+            commands.entity(entity).try_despawn();
         }
     }
 }
@@ -291,7 +295,9 @@ pub(crate) fn cap_toasts(
     for children in &layers {
         if children.len() > theme.max_toasts {
             for &old in &children[..children.len() - theme.max_toasts] {
-                commands.entity(old).despawn();
+                // May race a tap-dismiss or the timer expiry on this frame;
+                // tolerate a gone entity rather than warn.
+                commands.entity(old).try_despawn();
             }
         }
     }
@@ -341,6 +347,36 @@ mod tests {
             app.update();
         }
         assert_eq!(count_toasts(&mut app), 0, "toast should have expired");
+    }
+
+    #[test]
+    fn double_dismiss_is_a_noop() {
+        // A tap racing the timer expiry / cap can queue two despawns of the same
+        // toast in one frame. The second must see a gone entity quietly (no
+        // `entity does not exist`), leaving the toast count at zero.
+        let mut app = app_with_modal();
+        app.world_mut()
+            .run_system_once(|mut commands: Commands| {
+                toast(&mut commands, "saved").push();
+            })
+            .unwrap();
+        app.update(); // apply the spawn
+
+        let toast = app
+            .world_mut()
+            .query_filtered::<Entity, With<Toast>>()
+            .iter(app.world())
+            .next()
+            .expect("a toast spawned");
+
+        app.world_mut()
+            .run_system_once(move |mut commands: Commands| {
+                commands.entity(toast).try_despawn();
+                commands.entity(toast).try_despawn();
+            })
+            .unwrap();
+
+        assert_eq!(count_toasts(&mut app), 0, "the toast is gone, once");
     }
 
     #[test]
