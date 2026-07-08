@@ -2,10 +2,12 @@
 
 A modal/overlay stack for native `bevy_ui`. It fixes one specific, recurring
 bug — **stacked popups leak input** — and folds away the `children!` /
-`SpawnWith` boilerplate while it's there. No retained widget framework, no
-layout engine: it emits ordinary `bevy_ui` nodes. On top of the stack it ships
-two conveniences: **toasts** (transient, non-blocking notifications) and a
-**confirm dialog** (a titled two-button modal).
+`SpawnWith` boilerplate while it's there. No retained layout engine: it emits
+ordinary `bevy_ui` nodes. On top of the stack it ships **toasts** (transient,
+non-blocking notifications), a **confirm dialog** (a titled two-button modal),
+and a set of standalone **themed widgets** — button, toggle, slider and
+scrollable list — that spawn anywhere (title screens, settings, HUD), skinned
+from the same `Theme` and wired into the same keyboard-focus navigation.
 
 > **Status: experimental (0.1, pre-release).** Built to be dogfooded across
 > several games before it hits crates.io; the API will move. Consume via a path
@@ -248,11 +250,32 @@ by a manual `Time` step so it's deterministic, not wall-clock).
 cargo test
 ```
 
+## Widgets
+
+Standalone leaf widgets (not a layout DSL — you own the layout) spawn through
+the `WidgetSpawnerExt` trait on the `bevy_ui` child spawner, styled from the
+`Theme` and driven by a callback:
+
+```rust
+let scope = commands.spawn((FocusScope, Node::default())).id();
+commands.entity(scope).with_children(|p| {
+    p.button(&theme, scope, 0, "Play", |c| { /* … */ });
+    p.toggle(&theme, scope, 1, "Sound", true, |_c, on| { /* … */ });
+    p.slider(&theme, scope, 2, 0.0..=1.0, 0.8, |_c, v| { /* … */ });
+    p.list(&theme); // fill with your own rows
+});
+```
+
+A `FocusScope` container makes its widgets tab-navigable outside an overlay
+(inside one, the overlay root is the scope). An open overlay takes focus
+priority; it returns to the scope on close.
+
 ## Limitations / roadmap
 
 - Keyboard + pointer navigation only — **no gamepad** (by choice).
-- Built-in panel is intentionally minimal (title / body / buttons). Richer
-  layouts go through `.content()` — by design, not omission.
+- The built-in overlay panel stays minimal (title / body / buttons); richer
+  panel layouts still go through `.content()`. Standalone screens compose the
+  widgets above.
 
 ## Authorship
 
