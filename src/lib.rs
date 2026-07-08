@@ -54,6 +54,7 @@ mod stack;
 mod theme;
 mod toast;
 mod transition;
+mod widgets;
 
 #[cfg(test)]
 mod tests;
@@ -61,17 +62,20 @@ mod tests;
 pub use build::{OverlayBuilder, overlay};
 pub use confirm::{ConfirmBuilder, confirm};
 pub use events::{CloseReason, OverlayClosed, OverlayOpened};
+pub use focus::FocusScope;
 pub use gate::{UiCapturing, ui_not_capturing};
 pub use safe_area::SafeAreaInsets;
 pub use stack::{Overlay, OverlayCommandsExt, OverlayStack};
 pub use theme::Theme;
 pub use toast::{ToastBuilder, ToastLevel, ToastPosition, toast};
+pub use widgets::{Scrollable, Slider, Toggle, WidgetSpawnerExt};
 
 pub mod prelude {
     pub use crate::{
-        CloseReason, ConfirmBuilder, ModalPlugin, Overlay, OverlayBuilder, OverlayClosed,
-        OverlayCommandsExt, OverlayOpened, OverlayStack, SafeAreaInsets, Theme, ToastBuilder,
-        ToastLevel, ToastPosition, UiCapturing, confirm, overlay, toast, ui_not_capturing,
+        CloseReason, ConfirmBuilder, FocusScope, ModalPlugin, Overlay, OverlayBuilder,
+        OverlayClosed, OverlayCommandsExt, OverlayOpened, OverlayStack, SafeAreaInsets, Scrollable,
+        Slider, Theme, ToastBuilder, ToastLevel, ToastPosition, Toggle, UiCapturing,
+        WidgetSpawnerExt, confirm, overlay, toast, ui_not_capturing,
     };
 }
 
@@ -108,6 +112,20 @@ impl Plugin for ModalPlugin {
                     )
                         .chain(),
                     build::react_buttons,
+                    (
+                        widgets::react_toggles,
+                        widgets::toggle_keyboard,
+                        widgets::slider_drag,
+                        widgets::slider_keyboard,
+                        widgets::react_sliders,
+                        // Only when an input backend supplies wheel messages
+                        // (absent under `MinimalPlugins` in headless tests).
+                        widgets::scroll_lists.run_if(
+                            resource_exists::<
+                                bevy::ecs::message::Messages<bevy::input::mouse::MouseWheel>,
+                            >,
+                        ),
+                    ),
                     toast::expire_toasts,
                     toast::cap_toasts,
                     safe_area::apply_safe_area,
