@@ -56,12 +56,12 @@ fn capturing(app: &App) -> bool {
     app.world().resource::<UiCapturing>().0
 }
 
-/// The focusable buttons of `overlay`, in navigation order.
-fn focusables_of(app: &mut App, overlay: Entity) -> Vec<Entity> {
+/// The focusable buttons of `scope`, in navigation order.
+fn focusables_of(app: &mut App, scope: Entity) -> Vec<Entity> {
     let mut query = app.world_mut().query::<(Entity, &Focusable)>();
     let mut found: Vec<(usize, Entity)> = query
         .iter(app.world())
-        .filter(|(_, f)| f.overlay == overlay)
+        .filter(|(_, f)| f.scope == scope)
         .map(|(e, f)| (f.order, e))
         .collect();
     found.sort_by_key(|(order, _)| *order);
