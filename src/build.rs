@@ -27,6 +27,10 @@ type ButtonCb = Box<dyn FnMut(&mut Commands) + Send + Sync>;
 pub(crate) struct ButtonAction(ButtonCb);
 
 impl ButtonAction {
+    pub(crate) fn new(cb: ButtonCb) -> Self {
+        ButtonAction(cb)
+    }
+
     pub(crate) fn run(&mut self, commands: &mut Commands) {
         (self.0)(commands);
     }
@@ -42,7 +46,34 @@ type ContentFn = Box<dyn FnOnce(&mut ChildSpawnerCommands) + Send + Sync>;
 
 #[derive(Component, Clone, Copy)]
 pub(crate) struct ModalButtonStyle {
-    accent: Color,
+    pub(crate) accent: Color,
+}
+
+impl ModalButtonStyle {
+    pub(crate) fn new(accent: Color) -> Self {
+        ModalButtonStyle { accent }
+    }
+}
+
+/// The shared visual bundle for a themed button — the `Node` frame plus the
+/// rest/hover/press skin driven by [`react_buttons`]. Both the overlay panel and
+/// the standalone [`widgets`](crate::widgets) button build on this so they skin
+/// identically. `padding` lets a caller size the button (panel buttons are
+/// roomier than inline widget buttons).
+pub(crate) fn button_visual(theme: &Theme, accent: Color, padding: UiRect) -> impl Bundle {
+    (
+        Node {
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            padding,
+            border: UiRect::all(Val::Px(theme.button_border)),
+            ..default()
+        },
+        Button,
+        BackgroundColor(accent.with_alpha(theme.btn_fill_rest)),
+        BorderColor::all(accent.with_alpha(theme.btn_border_rest)),
+        ModalButtonStyle::new(accent),
+    )
 }
 
 /// Chained overlay builder. Borrows `Commands` for the duration of one
@@ -287,22 +318,9 @@ impl Command for SpawnOverlay {
             for (order, (text, on_click)) in self.buttons.into_iter().enumerate() {
                 let button = world
                     .spawn((
-                        Node {
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            padding: UiRect::axes(Val::Px(18.0), Val::Px(8.0)),
-                            border: UiRect::all(Val::Px(theme.button_border)),
-                            ..default()
-                        },
-                        Button,
-                        BackgroundColor(accent.with_alpha(theme.btn_fill_rest)),
-                        BorderColor::all(accent.with_alpha(theme.btn_border_rest)),
-                        ModalButtonStyle { accent },
+                        button_visual(&theme, accent, UiRect::axes(Val::Px(18.0), Val::Px(8.0))),
                         ButtonAction(on_click),
-                        Focusable {
-                            overlay: root,
-                            order,
-                        },
+                        Focusable { scope: root, order },
                     ))
                     .id();
                 let label = world

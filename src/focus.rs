@@ -1,43 +1,64 @@
-//! Focus and keyboard navigation for overlay buttons.
+//! Focus and keyboard navigation for focusable widgets.
 //!
-//! Builder buttons get a [`Focusable`] tagged with their overlay root and spawn
-//! order. Exactly one button is [`Focused`] at a time, and only the **top**
-//! overlay's focusables take part. Opening an overlay focuses its first button;
-//! Tab / Shift+Tab and the arrow keys move focus; Enter / Space activate the
-//! focused button via its [`ButtonAction`](crate::build::ButtonAction) — the very
-//! action a pointer click runs, so pointer and keyboard share one path.
+//! A navigable widget gets a [`Focusable`] tagged with its **scope** and tab
+//! order. A scope is either an overlay root or a standalone [`FocusScope`]
+//! container (a title screen, a settings page) — so widgets navigate the same
+//! way inside or outside an overlay. Exactly one widget is [`Focused`] at a
+//! time, and only the **active** scope's focusables take part: the top overlay
+//! if one is open, otherwise a standalone `FocusScope`. Tab / Shift+Tab and the
+//! arrow keys move focus; Enter / Space activate the focused widget via its
+//! [`ButtonAction`](crate::build::ButtonAction) — the very action a pointer
+//! click runs, so pointer and keyboard share one path.
 
 use bevy::prelude::*;
 
 use crate::build::ButtonAction;
 use crate::stack::OverlayStack;
 
-/// A navigable button. `overlay` is its root (focus is per top-overlay); `order`
-/// is its spawn position, for stable next/prev navigation.
+/// Marks a container as a standalone keyboard-focus scope — a full-screen
+/// destination (title, settings, HUD) whose [`Focusable`] widgets should
+/// tab-navigate even though no overlay is open. Give each child widget this
+/// entity as its `scope`. When an overlay is open it takes focus priority; focus
+/// returns to the scope once the overlay closes.
+#[derive(Component)]
+pub struct FocusScope;
+
+/// A navigable widget. `scope` is its owning overlay root or [`FocusScope`]
+/// container; `order` is its tab position, for stable next/prev navigation.
 #[derive(Component)]
 pub(crate) struct Focusable {
-    pub(crate) overlay: Entity,
+    pub(crate) scope: Entity,
     pub(crate) order: usize,
 }
 
-/// The single currently-focused button, if any.
+/// The single currently-focused widget, if any.
 #[derive(Component)]
 pub(crate) struct Focused;
+
+/// The scope that currently owns keyboard focus: the top overlay if one is open,
+/// otherwise a standalone [`FocusScope`]. `None` when neither exists.
+pub(crate) fn active_scope(
+    stack: &OverlayStack,
+    scopes: &Query<Entity, With<FocusScope>>,
+) -> Option<Entity> {
+    stack.top().or_else(|| scopes.iter().next())
+}
 
 /// Keep focus on the top overlay: when the top changes (open/close) or the
 /// current focus is stale, move focus to the top overlay's first focusable; clear
 /// it when no overlay (or no focusable) applies.
 pub(crate) fn maintain_focus(
     stack: Res<OverlayStack>,
+    scopes: Query<Entity, With<FocusScope>>,
     focusables: Query<(Entity, &Focusable)>,
     focused: Query<Entity, With<Focused>>,
     mut commands: Commands,
 ) {
-    let top = stack.top();
+    let active = active_scope(&stack, &scopes);
     let valid = focused.iter().next().is_some_and(|f| {
         focusables
             .get(f)
-            .map(|(_, x)| Some(x.overlay) == top)
+            .map(|(_, x)| Some(x.scope) == active)
             .unwrap_or(false)
     });
     if valid {
@@ -46,8 +67,8 @@ pub(crate) fn maintain_focus(
     for entity in &focused {
         commands.entity(entity).remove::<Focused>();
     }
-    if let Some(top) = top
-        && let Some(first) = lowest_order(&focusables, top)
+    if let Some(active) = active
+        && let Some(first) = lowest_order(&focusables, active)
     {
         commands.entity(first).insert(Focused);
     }
@@ -58,11 +79,12 @@ pub(crate) fn maintain_focus(
 pub(crate) fn navigate_focus(
     keys: Res<ButtonInput<KeyCode>>,
     stack: Res<OverlayStack>,
+    scopes: Query<Entity, With<FocusScope>>,
     focusables: Query<(Entity, &Focusable)>,
     focused: Query<Entity, With<Focused>>,
     mut commands: Commands,
 ) {
-    let Some(top) = stack.top() else {
+    let Some(active) = active_scope(&stack, &scopes) else {
         return;
     };
     let shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
@@ -78,7 +100,7 @@ pub(crate) fn navigate_focus(
 
     let mut list: Vec<(usize, Entity)> = focusables
         .iter()
-        .filter(|(_, f)| f.overlay == top)
+        .filter(|(_, f)| f.scope == active)
         .map(|(e, f)| (f.order, e))
         .collect();
     if list.is_empty() {
@@ -134,10 +156,10 @@ pub(crate) fn hover_focuses(
     }
 }
 
-fn lowest_order(focusables: &Query<(Entity, &Focusable)>, overlay: Entity) -> Option<Entity> {
+fn lowest_order(focusables: &Query<(Entity, &Focusable)>, scope: Entity) -> Option<Entity> {
     focusables
         .iter()
-        .filter(|(_, f)| f.overlay == overlay)
+        .filter(|(_, f)| f.scope == scope)
         .min_by_key(|(_, f)| f.order)
         .map(|(entity, _)| entity)
 }
