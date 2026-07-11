@@ -283,7 +283,10 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
         on_change: impl FnMut(&mut Commands, f32) + Send + Sync + 'static,
     ) -> EntityCommands<'_> {
         let accent = theme.accent;
-        let (min, max) = (*range.start(), *range.end());
+        // Order the endpoints: an inverted range would make `f32::clamp` panic
+        // (min > max) and break `fraction`/`set_fraction`.
+        let (lo, hi) = (*range.start(), *range.end());
+        let (min, max) = (lo.min(hi), lo.max(hi));
         let slider = Slider {
             value: initial.clamp(min, max),
             min,
@@ -337,20 +340,24 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
             BackgroundColor(theme.ink),
             BorderColor::all(theme.line),
             Scrollable,
+            // Without an Interaction (populated only for pickable entities) the
+            // `scroll_lists` query matches nothing and the wheel never scrolls.
+            Interaction::default(),
+            Pickable::default(),
         ))
     }
 }
 
 // ---- Reactive systems ----
 
-/// Move a toggle's knob and tint its track to match its state (and focus/press).
+/// Move a toggle's knob and tint its track to match its on/off state.
 pub(crate) fn react_toggles(
-    toggles: Query<(&Toggle, &Children, Has<Focused>, &Interaction), Changed<Toggle>>,
+    toggles: Query<(&Toggle, &Children), Changed<Toggle>>,
     mut tracks: Query<(&mut Node, &mut BackgroundColor), Without<Toggle>>,
     knobs: Query<(), With<ToggleKnob>>,
     children_of: Query<&Children>,
 ) {
-    for (toggle, kids, _focused, _interaction) in &toggles {
+    for (toggle, kids) in &toggles {
         // The track is the toggle's child that itself owns a ToggleKnob child.
         for &child in kids {
             let has_knob = children_of
@@ -406,9 +413,11 @@ pub(crate) fn slider_drag(
         let Some(pos) = cursor.normalized else {
             continue;
         };
-        let before = slider.value;
-        slider.set_fraction(pos.x);
-        if slider.value != before {
+        // Compute the target first and only write on a real change, so a held
+        // pointer at a fixed spot doesn't mark Slider `Changed` every frame.
+        let target = slider.min + pos.x.clamp(0.0, 1.0) * (slider.max - slider.min);
+        if target != slider.value {
+            slider.value = target;
             (action.0)(&mut commands, slider.value);
         }
     }
@@ -680,6 +689,31 @@ mod tests {
             node.overflow,
             Overflow::scroll_y(),
             "the list scrolls vertically"
+        );
+    }
+
+    #[test]
+    fn list_is_wired_for_wheel_scrolling() {
+        // The list must carry Interaction + ScrollPosition or `scroll_lists`'
+        // query matches nothing and the wheel does nothing.
+        let mut app = app();
+        app.world_mut()
+            .run_system_once(|mut commands: Commands, theme: Res<Theme>| {
+                commands.spawn(Node::default()).with_children(|p| {
+                    p.list(&theme);
+                });
+            })
+            .unwrap();
+        app.update();
+
+        let matched = app
+            .world_mut()
+            .query_filtered::<(&Interaction, &ScrollPosition), With<Scrollable>>()
+            .iter(app.world())
+            .count();
+        assert_eq!(
+            matched, 1,
+            "the list is reachable by the scroll_lists query"
         );
     }
 }
