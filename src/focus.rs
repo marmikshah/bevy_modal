@@ -41,7 +41,10 @@ pub(crate) fn active_scope(
     stack: &OverlayStack,
     scopes: &Query<Entity, With<FocusScope>>,
 ) -> Option<Entity> {
-    stack.top().or_else(|| scopes.iter().next())
+    // An open overlay always wins. Among standalone scopes (an ambiguous case —
+    // one active scope is the intended design) pick the lowest entity so the
+    // choice is at least stable frame-to-frame rather than query-order-random.
+    stack.top().or_else(|| scopes.iter().min())
 }
 
 /// Keep focus on the top overlay: when the top changes (open/close) or the
@@ -138,14 +141,19 @@ pub(crate) fn activate_focused(
 }
 
 /// Hovering a button focuses it, so pointer and keyboard focus stay in agreement.
+/// Only within the active scope: hovering a widget in an inactive scope must not
+/// steal focus (and let an Enter/Space fire it before `maintain_focus` corrects).
 #[allow(clippy::type_complexity)]
 pub(crate) fn hover_focuses(
-    changed: Query<(Entity, &Interaction), (Changed<Interaction>, With<Focusable>)>,
+    stack: Res<OverlayStack>,
+    scopes: Query<Entity, With<FocusScope>>,
+    changed: Query<(Entity, &Interaction, &Focusable), Changed<Interaction>>,
     focused: Query<Entity, With<Focused>>,
     mut commands: Commands,
 ) {
-    for (entity, interaction) in &changed {
-        if *interaction == Interaction::Hovered {
+    let active = active_scope(&stack, &scopes);
+    for (entity, interaction, focusable) in &changed {
+        if *interaction == Interaction::Hovered && Some(focusable.scope) == active {
             for other in &focused {
                 if other != entity {
                     commands.entity(other).remove::<Focused>();
