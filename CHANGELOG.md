@@ -7,6 +7,16 @@ version history and the git log.
 
 ## Unreleased
 
+## 0.3.2 — 2026-07-17
+
+### Fixed
+
+- The built-in overlay panel now clamps to 90% of the viewport height and
+  scrolls vertically past the clamp — tall overlays (long body lists, many
+  buttons) no longer grow past the window and clip off both ends. The panel
+  answers the existing wheel-scroll system (`Scrollable` + `Interaction` +
+  `Pickable`), and short panels look exactly as before.
+
 ## 0.3.1 — 2026-07-11
 
 Review follow-ups on the 0.3.0 widget + focus work.

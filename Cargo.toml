@@ -1,6 +1,6 @@
 [package]
 name = "bevy_modal"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 license = "MIT"
 description = "Modal/overlay stack for bevy_ui: a blocking scrim, deterministic layering, an input-capture gate, open/close transitions, keyboard navigation, lifecycle events, safe-area awareness, toasts and a confirm dialog. Native bevy_ui, no widget framework."
