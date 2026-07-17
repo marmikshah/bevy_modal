@@ -271,8 +271,12 @@ impl Command for SpawnOverlay {
                     Node {
                         width: Val::Percent(82.0),
                         max_width: Val::Px(theme.panel_max_width),
+                        // Never taller than the viewport: content past the
+                        // clamp scrolls instead of clipping off both ends.
+                        max_height: Val::Vh(90.0),
+                        overflow: Overflow::scroll_y(),
                         flex_direction: FlexDirection::Column,
-                        justify_content: JustifyContent::Center,
+                        justify_content: JustifyContent::FlexStart,
                         align_items: AlignItems::Center,
                         row_gap: Val::Px(16.0),
                         padding: UiRect::axes(Val::Px(16.0), Val::Px(24.0)),
@@ -281,6 +285,11 @@ impl Command for SpawnOverlay {
                     },
                     BackgroundColor(theme.ink),
                     BorderColor::all(theme.line),
+                    crate::widgets::Scrollable,
+                    // Interaction makes the wheel-scroll query match; without a
+                    // pickable target the panel never reports hover.
+                    Interaction::default(),
+                    Pickable::default(),
                 ))
                 .id();
             world.entity_mut(root).add_child(panel);
