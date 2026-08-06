@@ -113,7 +113,7 @@ fn ask(mut commands: Commands) {
 | Item | What it does |
 |------|--------------|
 | `ModalPlugin` | Wires the stack, transitions, focus/keyboard nav, lifecycle messages, the input gate, safe-area, toasts and button feedback; registers a default `Theme`. |
-| `overlay(c, id)` | Builder for a modal overlay (`title`/`body`/`button`/`content`/`dismissable`/`escape`/`accent`). `push()` / `push_unique()`. |
+| `overlay(c, id)` | Builder for a modal overlay (`title`/`body`/`body_tagged`/`button`/`content`/`dismissable`/`escape`/`accent`). `push()` / `push_unique()`. |
 | `confirm(c, id, title)` | Two-button dialog (`message`/`confirm_label`/`cancel_label`/`on_confirm`/`on_cancel`/`accent`). `push()`. |
 | `toast(c, msg)` | Transient notification (`level`/`duration`/`accent`/`action`). `push()`. |
 | `OverlayOpened` / `OverlayClosed` | Lifecycle messages; `OverlayClosed` carries a `CloseReason`. |
@@ -122,6 +122,7 @@ fn ask(mut commands: Commands) {
 | `OverlayCommandsExt::dismiss_overlay(id)` | Despawn the open overlay with this id. |
 | `UiCapturing` / `ui_not_capturing` | The input gate resource + run condition. |
 | `Theme` | Injected colours (incl. semantic + scrim), fonts, borders, transition timing, toast position, sizing. |
+| `ThemedPanel` / `ThemedScrim` / `ThemedText` / `ThemedButton` | Public semantic components used by built-in overlays and available to bespoke content. |
 
 ## The input-gate contract (read this)
 
@@ -143,7 +144,9 @@ Everything is driven by an injected `Theme` resource (colours, fonts, border
 widths, button-state alphas, and the transition timing below). A neutral dark
 default is registered by `ModalPlugin` so examples run with zero setup; insert
 your own to match your game's chrome. Toasts reuse the same palette (`ink` fill,
-`accent` border).
+`accent` border). Replacing or mutating `Theme` also recolours an already-open
+built-in overlay in place; its root, focus, stack position, and field identity
+do not change.
 
 ## Transitions
 
@@ -210,7 +213,9 @@ and dogfood before this hits crates.io.
 Two tiers, pick per screen:
 
 - **Built-in panel** — `overlay(c, id).title(..).body(..).button(label, on_click)`.
-  The crate builds the panel; good for simple dialogs.
+  The crate builds the panel; good for simple dialogs. Use
+  `.body_tagged(text, component)` for a dynamic row that needs caller-owned,
+  copy-independent identity after it spawns.
 - **Bespoke content** — `overlay(c, id).content(|parent| { /* your bevy_ui */ })`.
   The crate owns the (scrimmed, stacked, gated) root; you fill it. The closure
   gets a `&mut ChildSpawnerCommands` — the spawner `Commands::spawn().with_children`

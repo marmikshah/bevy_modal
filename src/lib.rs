@@ -59,14 +59,14 @@ mod widgets;
 #[cfg(test)]
 mod tests;
 
-pub use build::{OverlayBuilder, overlay};
+pub use build::{OverlayBuilder, ThemedButton, overlay};
 pub use confirm::{ConfirmBuilder, confirm};
 pub use events::{CloseReason, OverlayClosed, OverlayOpened};
 pub use focus::FocusScope;
 pub use gate::{UiCapturing, ui_not_capturing};
 pub use safe_area::SafeAreaInsets;
 pub use stack::{Overlay, OverlayCommandsExt, OverlayStack};
-pub use theme::Theme;
+pub use theme::{Theme, ThemedPanel, ThemedScrim, ThemedText};
 pub use toast::{ToastBuilder, ToastLevel, ToastPosition, toast};
 pub use widgets::{Scrollable, Slider, Toggle, WidgetSpawnerExt};
 
@@ -74,8 +74,9 @@ pub mod prelude {
     pub use crate::{
         CloseReason, ConfirmBuilder, FocusScope, ModalPlugin, Overlay, OverlayBuilder,
         OverlayClosed, OverlayCommandsExt, OverlayOpened, OverlayStack, SafeAreaInsets, Scrollable,
-        Slider, Theme, ToastBuilder, ToastLevel, ToastPosition, Toggle, UiCapturing,
-        WidgetSpawnerExt, confirm, overlay, toast, ui_not_capturing,
+        Slider, Theme, ThemedButton, ThemedPanel, ThemedScrim, ThemedText, ToastBuilder,
+        ToastLevel, ToastPosition, Toggle, UiCapturing, WidgetSpawnerExt, confirm, overlay, toast,
+        ui_not_capturing,
     };
 }
 
@@ -98,7 +99,7 @@ impl Plugin for ModalPlugin {
             .add_systems(
                 Update,
                 (
-                    transition::drive_transitions,
+                    (theme::apply_theme, transition::drive_transitions).chain(),
                     events::announce_opened,
                     stack::prune_despawned_overlays,
                     stack::escape_pops_top,
