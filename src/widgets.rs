@@ -35,7 +35,7 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::build::{ButtonAction, button_visual};
 use crate::focus::{Focusable, Focused};
-use crate::theme::Theme;
+use crate::theme::{Theme, ThemedText};
 
 // ---- Button ----
 
@@ -156,10 +156,9 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
         label: impl Into<String>,
         on_click: impl FnMut(&mut Commands) + Send + Sync + 'static,
     ) -> EntityCommands<'_> {
-        let accent = theme.accent;
         let text = label.into();
         let mut ec = self.spawn((
-            button_visual(theme, accent, UiRect::axes(Val::Px(16.0), Val::Px(8.0))),
+            button_visual(theme, None, UiRect::axes(Val::Px(16.0), Val::Px(8.0))),
             ButtonAction::new(Box::new(on_click) as ClickCb),
             Focusable { scope, order },
         ));
@@ -174,6 +173,7 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
                     ..default()
                 },
                 TextColor(color),
+                ThemedText::Primary,
             ));
         });
         let id = ec.id();

@@ -17,13 +17,12 @@ use bevy::ui::FocusPolicy;
 
 use crate::events::{CloseReason, OverlayClosed, OverlayOpened};
 use crate::focus::{Focusable, Focused};
-use crate::scrim::Scrim;
 use crate::stack::{Z_BASE, Z_STEP};
 use crate::toast::{Toast, ToastLayer};
 use crate::transition::OverlayBody;
 use crate::{
-    ModalPlugin, OverlayCommandsExt, OverlayStack, SafeAreaInsets, Theme, UiCapturing, overlay,
-    toast,
+    ModalPlugin, OverlayCommandsExt, OverlayStack, SafeAreaInsets, Theme, ThemedButton,
+    ThemedPanel, ThemedScrim, ThemedText, UiCapturing, overlay, toast,
 };
 
 /// A headless app with the plugin wired, a keyboard resource (which
@@ -549,7 +548,7 @@ fn scrim_blocks_the_interaction_path() {
 
     let mut query = app
         .world_mut()
-        .query_filtered::<&FocusPolicy, With<Scrim>>();
+        .query_filtered::<&FocusPolicy, With<ThemedScrim>>();
     let policy = query.iter(app.world()).next().expect("a scrim");
     assert!(
         matches!(policy, FocusPolicy::Block),
@@ -583,6 +582,88 @@ fn content_spawns_caller_children_via_command_spawner() {
         2,
         "the caller's content children were spawned"
     );
+}
+
+#[derive(Component)]
+struct DynamicBodyField;
+
+#[test]
+fn body_tagged_attaches_caller_identity_at_spawn() {
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "settings")
+                .body_tagged("PALETTE  DAY", DynamicBodyField)
+                .push();
+        })
+        .unwrap();
+    app.update();
+
+    let mut fields = app
+        .world_mut()
+        .query_filtered::<&Text, With<DynamicBodyField>>();
+    assert_eq!(fields.single(app.world()).unwrap().as_str(), "PALETTE  DAY");
+}
+
+#[test]
+fn active_overlay_rethemes_in_place() {
+    let mut app = test_app();
+    app.world_mut()
+        .run_system_once(|mut commands: Commands| {
+            overlay(&mut commands, "settings")
+                .title("SETTINGS")
+                .body("Live presentation")
+                .button("Apply", |_| {})
+                .push();
+        })
+        .unwrap();
+    settle(&mut app);
+    let root = app.world().resource::<OverlayStack>().roots[0];
+
+    {
+        let mut theme = app.world_mut().resource_mut::<Theme>();
+        theme.ink = Color::srgb(0.11, 0.22, 0.33);
+        theme.line = Color::srgb(0.44, 0.55, 0.66);
+        theme.text = Color::srgb(0.77, 0.78, 0.79);
+        theme.text_dim = Color::srgb(0.61, 0.62, 0.63);
+        theme.scrim = Color::srgba(0.21, 0.22, 0.23, 0.72);
+        theme.accent = Color::srgb(0.82, 0.52, 0.12);
+    }
+    app.update();
+
+    assert_eq!(app.world().resource::<OverlayStack>().roots, [root]);
+
+    let mut panel = app
+        .world_mut()
+        .query_filtered::<(&BackgroundColor, &BorderColor), With<ThemedPanel>>();
+    let (background, border) = panel.single(app.world()).unwrap();
+    let theme = app.world().resource::<Theme>().clone();
+    assert_eq!(background.0, theme.ink);
+    assert_eq!(*border, BorderColor::all(theme.line));
+
+    let mut text = app
+        .world_mut()
+        .query_filtered::<(&ThemedText, &TextColor), With<Text>>();
+    for (role, color) in text.iter(app.world()) {
+        let expected = match role {
+            ThemedText::Primary => theme.text,
+            ThemedText::Secondary => theme.text_dim,
+            ThemedText::Accent(None) => theme.accent,
+            ThemedText::Accent(Some(accent)) => *accent,
+        };
+        assert_eq!(color.0, expected);
+    }
+
+    let mut scrim = app
+        .world_mut()
+        .query_filtered::<&BackgroundColor, With<ThemedScrim>>();
+    assert_eq!(scrim.single(app.world()).unwrap().0, theme.scrim);
+
+    let mut button = app
+        .world_mut()
+        .query_filtered::<&BackgroundColor, With<ThemedButton>>();
+    let button = button.single(app.world()).unwrap();
+    assert_eq!(button.0, theme.accent.with_alpha(theme.btn_fill_hover));
 }
 
 #[test]

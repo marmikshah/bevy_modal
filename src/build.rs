@@ -12,7 +12,7 @@ use crate::events::CloseReason;
 use crate::focus::{Focusable, Focused};
 use crate::scrim::scrim_bundle;
 use crate::stack::{Overlay, OverlayStack, Z_BASE, Z_STEP, push_root};
-use crate::theme::Theme;
+use crate::theme::{Theme, ThemedPanel, ThemedText};
 use crate::transition::{OverlayBody, Transition, request_close};
 
 /// A button's click handler. Boxed `FnMut` so the builder stays non-generic;
@@ -44,14 +44,40 @@ impl ButtonAction {
 /// yields — so existing `bevy_ui` builder helpers drop in without re-authoring.
 type ContentFn = Box<dyn FnOnce(&mut ChildSpawnerCommands) + Send + Sync>;
 
-#[derive(Component, Clone, Copy)]
-pub(crate) struct ModalButtonStyle {
-    pub(crate) accent: Color,
+type BodyDecorator = Box<dyn FnOnce(&mut World, Entity) + Send + Sync>;
+
+struct BodyLine {
+    text: String,
+    decorate: Option<BodyDecorator>,
 }
 
-impl ModalButtonStyle {
-    pub(crate) fn new(accent: Color) -> Self {
-        ModalButtonStyle { accent }
+/// Semantic styling for a button whose default accent follows the live
+/// [`Theme`]. A builder-level accent override remains fixed.
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct ThemedButton {
+    accent: Option<Color>,
+}
+
+impl ThemedButton {
+    /// Follow [`Theme::accent`], including runtime theme changes.
+    pub const fn default_accent() -> Self {
+        Self { accent: None }
+    }
+
+    /// Retain an explicit accent while still following theme interaction
+    /// alphas and border widths.
+    pub const fn accent(color: Color) -> Self {
+        Self {
+            accent: Some(color),
+        }
+    }
+
+    fn new(accent: Option<Color>) -> Self {
+        Self { accent }
+    }
+
+    fn resolve(self, theme: &Theme) -> Color {
+        self.accent.unwrap_or(theme.accent)
     }
 }
 
@@ -60,7 +86,8 @@ impl ModalButtonStyle {
 /// the standalone [`widgets`](crate::widgets) button build on this so they skin
 /// identically. `padding` lets a caller size the button (panel buttons are
 /// roomier than inline widget buttons).
-pub(crate) fn button_visual(theme: &Theme, accent: Color, padding: UiRect) -> impl Bundle {
+pub(crate) fn button_visual(theme: &Theme, accent: Option<Color>, padding: UiRect) -> impl Bundle {
+    let resolved = accent.unwrap_or(theme.accent);
     (
         Node {
             justify_content: JustifyContent::Center,
@@ -70,9 +97,9 @@ pub(crate) fn button_visual(theme: &Theme, accent: Color, padding: UiRect) -> im
             ..default()
         },
         Button,
-        BackgroundColor(accent.with_alpha(theme.btn_fill_rest)),
-        BorderColor::all(accent.with_alpha(theme.btn_border_rest)),
-        ModalButtonStyle::new(accent),
+        BackgroundColor(resolved.with_alpha(theme.btn_fill_rest)),
+        BorderColor::all(resolved.with_alpha(theme.btn_border_rest)),
+        ThemedButton::new(accent),
     )
 }
 
@@ -120,7 +147,23 @@ impl<'a, 'w, 's> OverlayBuilder<'a, 'w, 's> {
 
     /// A line of body text. Call repeatedly for multiple lines.
     pub fn body(mut self, text: impl Into<String>) -> Self {
-        self.spec.body.push(text.into());
+        self.spec.body.push(BodyLine {
+            text: text.into(),
+            decorate: None,
+        });
+        self
+    }
+
+    /// A line of body text with a caller-owned marker attached at spawn time.
+    /// This gives dynamic fields stable identity without inspecting generated
+    /// hierarchy or matching their rendered copy.
+    pub fn body_tagged<T: Component>(mut self, text: impl Into<String>, marker: T) -> Self {
+        self.spec.body.push(BodyLine {
+            text: text.into(),
+            decorate: Some(Box::new(move |world, entity| {
+                world.entity_mut(entity).insert(marker);
+            })),
+        });
         self
     }
 
@@ -187,7 +230,7 @@ struct SpawnOverlay {
     id: String,
     accent: Option<Color>,
     title: Option<String>,
-    body: Vec<String>,
+    body: Vec<BodyLine>,
     buttons: Vec<(String, ButtonCb)>,
     dismissable: bool,
     pop_on_escape: bool,
@@ -285,6 +328,7 @@ impl Command for SpawnOverlay {
                     },
                     BackgroundColor(theme.ink),
                     BorderColor::all(theme.line),
+                    ThemedPanel,
                     crate::widgets::Scrollable,
                     // Interaction makes the wheel-scroll query match; without a
                     // pickable target the panel never reports hover.
@@ -304,6 +348,7 @@ impl Command for SpawnOverlay {
                             ..default()
                         },
                         TextColor(accent),
+                        ThemedText::Accent(self.accent),
                     ))
                     .id();
                 world.entity_mut(panel).add_child(label);
@@ -312,22 +357,30 @@ impl Command for SpawnOverlay {
             for line in self.body {
                 let label = world
                     .spawn((
-                        Text::new(line),
+                        Text::new(line.text),
                         TextFont {
                             font: theme.body.clone().into(),
                             font_size: FontSize::Px(22.0),
                             ..default()
                         },
                         TextColor(theme.text_dim),
+                        ThemedText::Secondary,
                     ))
                     .id();
+                if let Some(decorate) = line.decorate {
+                    decorate(world, label);
+                }
                 world.entity_mut(panel).add_child(label);
             }
 
             for (order, (text, on_click)) in self.buttons.into_iter().enumerate() {
                 let button = world
                     .spawn((
-                        button_visual(&theme, accent, UiRect::axes(Val::Px(18.0), Val::Px(8.0))),
+                        button_visual(
+                            &theme,
+                            self.accent,
+                            UiRect::axes(Val::Px(18.0), Val::Px(8.0)),
+                        ),
                         ButtonAction(on_click),
                         Focusable { scope: root, order },
                     ))
@@ -341,6 +394,7 @@ impl Command for SpawnOverlay {
                             ..default()
                         },
                         TextColor(theme.text),
+                        ThemedText::Primary,
                     ))
                     .id();
                 world.entity_mut(button).add_child(label);
@@ -375,27 +429,39 @@ impl Command for SpawnOverlay {
 /// button gets the hover look so the selection is visible without a pointer.
 /// Runs every frame (focus is a separate component from `Interaction`) but only
 /// writes when the target colour actually changes, so it stays cheap.
-pub(crate) fn react_buttons(
-    theme: Res<Theme>,
-    mut buttons: Query<(
-        &Interaction,
+type ThemedButtonQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static Interaction,
         Has<Focused>,
-        &ModalButtonStyle,
-        &mut BackgroundColor,
-        &mut BorderColor,
-    )>,
-) {
-    for (interaction, focused, style, mut bg, mut border) in buttons.iter_mut() {
+        &'static ThemedButton,
+        &'static mut Node,
+        &'static mut BackgroundColor,
+        &'static mut BorderColor,
+    ),
+>;
+
+pub(crate) fn react_buttons(theme: Res<Theme>, mut buttons: ThemedButtonQuery) {
+    for (interaction, focused, style, mut node, mut bg, mut border) in buttons.iter_mut() {
         let (fill, line) = match interaction {
             Interaction::Pressed => (theme.btn_fill_press, theme.btn_border_hover),
             Interaction::Hovered => (theme.btn_fill_hover, theme.btn_border_hover),
             Interaction::None if focused => (theme.btn_fill_hover, theme.btn_border_hover),
             Interaction::None => (theme.btn_fill_rest, theme.btn_border_rest),
         };
-        let new_bg = style.accent.with_alpha(fill);
+        let accent = style.resolve(&theme);
+        let button_border = UiRect::all(Val::Px(theme.button_border));
+        if node.border != button_border {
+            node.border = button_border;
+        }
+        let new_bg = accent.with_alpha(fill);
+        let new_border = BorderColor::all(accent.with_alpha(line));
         if bg.0 != new_bg {
             bg.0 = new_bg;
-            *border = BorderColor::all(style.accent.with_alpha(line));
+        }
+        if *border != new_border {
+            *border = new_border;
         }
     }
 }

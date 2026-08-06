@@ -16,6 +16,7 @@
 use bevy::prelude::*;
 
 use crate::events::{CloseReason, CloseReasons};
+use crate::theme::Theme;
 
 /// Tags the foreground node (built-in panel or content wrapper) so the
 /// transition scales it without scaling the full-screen scrim.
@@ -58,6 +59,12 @@ impl Transition {
             scrim_color,
             body,
             scale_from,
+        }
+    }
+
+    pub(crate) fn apply_theme(&mut self, theme: &Theme) {
+        if self.scrim_color != theme.scrim {
+            self.scrim_color = theme.scrim;
         }
     }
 }

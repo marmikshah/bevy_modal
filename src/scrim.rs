@@ -14,17 +14,14 @@
 use bevy::prelude::*;
 use bevy::ui::FocusPolicy;
 
-/// Tags the scrim. Dismissal is wired by the spawn command via an observer that
-/// captures the overlay root directly, so no back-reference is stored here.
-#[derive(Component)]
-pub(crate) struct Scrim;
+use crate::theme::ThemedScrim;
 
 /// The viewport-filling scrim bundle: blocks the `Interaction` path
 /// (`FocusPolicy::Block`) and the picking path (`Pickable`) so nothing below it
 /// can be hovered, pressed or clicked.
 pub(crate) fn scrim_bundle(color: Color) -> impl Bundle {
     (
-        Scrim,
+        ThemedScrim,
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(0.0),

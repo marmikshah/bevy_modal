@@ -7,6 +7,26 @@ use bevy::prelude::*;
 
 use crate::toast::ToastPosition;
 
+/// Semantic styling for text emitted by an overlay.
+///
+/// The component is public so bespoke overlay content can opt into the same
+/// live [`Theme`] projection as the built-in title, body, and button labels.
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub enum ThemedText {
+    Primary,
+    Secondary,
+    Accent(Option<Color>),
+}
+
+/// Marks a panel whose fill, border, and width follow the live [`Theme`].
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThemedPanel;
+
+/// Marks a scrim whose RGB follows the live [`Theme`] while retaining its
+/// transition-controlled alpha.
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThemedScrim;
+
 #[derive(Resource, Clone)]
 pub struct Theme {
     /// Panel fill (and toast fill).
@@ -81,5 +101,65 @@ impl Default for Theme {
             panel_max_width: 420.0,
             max_toasts: 4,
         }
+    }
+}
+
+type ThemedPanelQuery<'w, 's> = Query<
+    'w,
+    's,
+    (
+        &'static mut Node,
+        &'static mut BackgroundColor,
+        &'static mut BorderColor,
+    ),
+    (With<ThemedPanel>, Without<ThemedScrim>),
+>;
+
+pub(crate) fn apply_theme(
+    theme: Res<Theme>,
+    mut panels: ThemedPanelQuery,
+    mut scrims: Query<&mut BackgroundColor, (With<ThemedScrim>, Without<ThemedPanel>)>,
+    mut text: Query<(&ThemedText, &mut TextColor, &mut TextFont)>,
+    mut transitions: Query<&mut crate::transition::Transition>,
+) {
+    for (mut node, mut background, mut border) in &mut panels {
+        let max_width = Val::Px(theme.panel_max_width);
+        let panel_border = UiRect::all(Val::Px(theme.panel_border));
+        let line = BorderColor::all(theme.line);
+        if node.max_width != max_width {
+            node.max_width = max_width;
+        }
+        if node.border != panel_border {
+            node.border = panel_border;
+        }
+        if background.0 != theme.ink {
+            background.0 = theme.ink;
+        }
+        if *border != line {
+            *border = line;
+        }
+    }
+    for mut background in &mut scrims {
+        let next = theme.scrim.with_alpha(background.0.alpha());
+        if background.0 != next {
+            background.0 = next;
+        }
+    }
+    for (style, mut color, mut font) in &mut text {
+        let (next_color, next_font) = match style {
+            ThemedText::Primary => (theme.text, theme.body.clone()),
+            ThemedText::Secondary => (theme.text_dim, theme.body.clone()),
+            ThemedText::Accent(accent) => (accent.unwrap_or(theme.accent), theme.display.clone()),
+        };
+        if color.0 != next_color {
+            color.0 = next_color;
+        }
+        let next_font: FontSource = next_font.into();
+        if font.font != next_font {
+            font.font = next_font;
+        }
+    }
+    for mut transition in &mut transitions {
+        transition.apply_theme(&theme);
     }
 }
