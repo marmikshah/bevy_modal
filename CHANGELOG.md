@@ -7,6 +7,22 @@ version history and the git log.
 
 ## Unreleased
 
+## 0.3.3 — 2026-08-06
+
+### Added
+
+- Existing overlays now follow runtime `Theme` changes in place through public
+  `ThemedPanel`, `ThemedScrim`, `ThemedText`, and `ThemedButton` semantics.
+- `OverlayBuilder::body_tagged` attaches caller-owned field identity when a
+  built-in body row spawns, without hierarchy or rendered-copy inspection.
+
+### Fixed
+
+- Default overlay and standalone-button accents now follow the active theme;
+  explicit accent overrides remain fixed.
+- Live scrim recoloring preserves transition alpha and button rest, hover,
+  pressed, border, and font styling update without rebuilding the overlay.
+
 ## 0.3.2 — 2026-07-17
 
 ### Fixed
