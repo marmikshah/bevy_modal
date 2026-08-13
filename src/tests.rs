@@ -24,8 +24,8 @@ use crate::toast::{Toast, ToastLayer};
 use crate::transition::OverlayBody;
 use crate::{
     FocusScope, ModalPlugin, OverlayCommandsExt, OverlayStack, SafeAreaInsets, TextFace,
-    TextMetrics, TextRole, Theme, ThemedButton, ThemedPanel, ThemedScrim, ThemedText, Typography,
-    UiCapturing, WidgetSpawnerExt, overlay, toast,
+    TextMetrics, TextRole, TextTone, Theme, ThemedButton, ThemedPanel, ThemedScrim, ThemedText,
+    Typography, UiCapturing, WidgetSpawnerExt, overlay, toast,
 };
 
 /// A headless app with the plugin wired, a keyboard resource (which
@@ -648,11 +648,11 @@ fn active_overlay_rethemes_in_place() {
         .world_mut()
         .query_filtered::<(&ThemedText, &TextColor), With<Text>>();
     for (role, color) in text.iter(app.world()) {
-        let expected = match role {
-            ThemedText::Primary => theme.text,
-            ThemedText::Secondary => theme.text_dim,
-            ThemedText::Accent(None) => theme.accent,
-            ThemedText::Accent(Some(accent)) => *accent,
+        let expected = match role.tone {
+            TextTone::Primary => theme.text,
+            TextTone::Secondary => theme.text_dim,
+            TextTone::Accent => theme.accent,
+            TextTone::Fixed(color) => color,
         };
         assert_eq!(color.0, expected);
     }
@@ -687,9 +687,9 @@ fn every_emitted_text_surface_uses_configured_semantic_metrics() {
     app.insert_resource(Theme {
         display: display.clone(),
         body: body.clone(),
+        typography,
         ..Default::default()
     });
-    app.insert_resource(typography);
     app.world_mut()
         .run_system_once(|mut commands: Commands, theme: Res<Theme>| {
             overlay(&mut commands, "semantic")
@@ -712,7 +712,7 @@ fn every_emitted_text_surface_uses_configured_semantic_metrics() {
 
     let mut query = app
         .world_mut()
-        .query::<(&Text, &TextRole, &TextFont, &LineHeight, &LetterSpacing)>();
+        .query::<(&Text, &ThemedText, &TextFont, &LineHeight, &LetterSpacing)>();
     let emitted: Vec<_> = query
         .iter(app.world())
         .map(|(text, role, font, line_height, letter_spacing)| {
@@ -731,20 +731,24 @@ fn every_emitted_text_surface_uses_configured_semantic_metrics() {
         "every built-in text surface is role-owned"
     );
 
-    for (text, role, font, line_height, letter_spacing) in emitted {
-        let expected_role = match text.as_str() {
-            "Overlay title" => TextRole::OverlayTitle,
-            "Overlay body" => TextRole::OverlayBody,
-            "Overlay button" => TextRole::OverlayButton,
-            "Toast message" => TextRole::Toast,
-            "Toast action" => TextRole::ToastAction,
-            "Widget button" => TextRole::WidgetButton,
-            "Widget label" => TextRole::WidgetLabel,
+    for (text, style, font, line_height, letter_spacing) in emitted {
+        let (expected_role, expected_tone) = match text.as_str() {
+            "Overlay title" => (TextRole::OverlayTitle, TextTone::Accent),
+            "Overlay body" => (TextRole::OverlayBody, TextTone::Secondary),
+            "Overlay button" => (TextRole::OverlayButton, TextTone::Primary),
+            "Toast message" => (TextRole::Toast, TextTone::Primary),
+            "Toast action" => (
+                TextRole::ToastAction,
+                TextTone::Fixed(Theme::default().accent),
+            ),
+            "Widget button" => (TextRole::WidgetButton, TextTone::Primary),
+            "Widget label" => (TextRole::WidgetLabel, TextTone::Primary),
             other => panic!("unexpected emitted text: {other}"),
         };
-        assert_eq!(role, expected_role, "wrong role for {text}");
+        assert_eq!(style.role, expected_role, "wrong role for {text}");
+        assert_eq!(style.tone, expected_tone, "wrong tone for {text}");
 
-        let metrics = typography.metrics(role);
+        let metrics = typography.metrics(style.role);
         let expected_font: FontSource = match metrics.face {
             TextFace::Display => display.clone(),
             TextFace::Body => body.clone(),
@@ -771,8 +775,8 @@ fn every_emitted_text_surface_uses_configured_semantic_metrics() {
     // The semantic component also keeps an already-open entity live when the
     // caller swaps profiles or changes which family owns a role.
     {
-        let mut typography = app.world_mut().resource_mut::<Typography>();
-        typography.overlay_body = TextMetrics::new(TextFace::Display, 37.0, 1.4, 1.25);
+        let mut theme = app.world_mut().resource_mut::<Theme>();
+        theme.typography.overlay_body = TextMetrics::new(TextFace::Display, 37.0, 1.4, 1.25);
     }
     app.update();
     let (_, font, line_height, letter_spacing) = app

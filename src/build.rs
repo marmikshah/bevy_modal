@@ -12,7 +12,7 @@ use crate::events::CloseReason;
 use crate::focus::{Focusable, Focused};
 use crate::scrim::scrim_bundle;
 use crate::stack::{Overlay, OverlayStack, Z_BASE, Z_STEP, push_root};
-use crate::theme::{TextRole, Theme, ThemedPanel, ThemedText};
+use crate::theme::{TextRole, TextTone, Theme, ThemedPanel};
 use crate::transition::{OverlayBody, Transition, request_close};
 
 /// A button's click handler. Boxed `FnMut` so the builder stays non-generic;
@@ -248,7 +248,6 @@ impl Command for SpawnOverlay {
             return;
         }
         let theme = world.resource::<Theme>().clone();
-        let accent = self.accent.unwrap_or(theme.accent);
 
         let id = self.id.clone();
         let root = world
@@ -339,12 +338,11 @@ impl Command for SpawnOverlay {
             world.entity_mut(root).add_child(panel);
 
             if let Some(title) = self.title {
+                let tone = self.accent.map_or(TextTone::Accent, TextTone::Fixed);
                 let label = world
                     .spawn((
                         Text::new(title),
-                        TextRole::OverlayTitle,
-                        TextColor(accent),
-                        ThemedText::Accent(self.accent),
+                        theme.text_style(TextRole::OverlayTitle, tone),
                     ))
                     .id();
                 world.entity_mut(panel).add_child(label);
@@ -354,9 +352,7 @@ impl Command for SpawnOverlay {
                 let label = world
                     .spawn((
                         Text::new(line.text),
-                        TextRole::OverlayBody,
-                        TextColor(theme.text_dim),
-                        ThemedText::Secondary,
+                        theme.text_style(TextRole::OverlayBody, TextTone::Secondary),
                     ))
                     .id();
                 if let Some(decorate) = line.decorate {
@@ -380,9 +376,7 @@ impl Command for SpawnOverlay {
                 let label = world
                     .spawn((
                         Text::new(text),
-                        TextRole::OverlayButton,
-                        TextColor(theme.text),
-                        ThemedText::Primary,
+                        theme.text_style(TextRole::OverlayButton, TextTone::Primary),
                     ))
                     .id();
                 world.entity_mut(button).add_child(label);

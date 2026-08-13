@@ -121,8 +121,9 @@ fn ask(mut commands: Commands) {
 | `OverlayStack` | Live stack of open overlays; `is_open`/`entity`/`top`/`depth`. |
 | `OverlayCommandsExt::dismiss_overlay(id)` | Despawn the open overlay with this id. |
 | `UiCapturing` / `ui_not_capturing` | The input gate resource + run condition. |
-| `Theme` | Injected colours (incl. semantic + scrim), fonts, borders, transition timing, toast position, sizing. |
-| `Typography` / `TextRole` | Semantic face, size, line-height and tracking for every library-emitted text surface. |
+| `Theme` | The complete visual contract: colours, fonts, typography, borders, transitions, toast position, and sizing. |
+| `Typography` / `TextRole` | Semantic face, size, line-height, and tracking for every library-emitted text surface. |
+| `ThemedText` / `TextTone` | Required semantic identity for role-owned text and its primary, secondary, accent, or fixed colour. |
 | `ThemedPanel` / `ThemedScrim` / `ThemedText` / `ThemedButton` | Public semantic components used by built-in overlays and available to bespoke content. |
 
 ## The input-gate contract (read this)
@@ -141,26 +142,28 @@ Toasts are deliberately outside this contract: they never set `UiCapturing`.
 
 ## Theming
 
-Presentation is driven by the injected `Theme` and `Typography` resources. A
-neutral dark theme and the existing 0.3.3 type scale are registered by
-`ModalPlugin` so examples run with zero setup. Applications can replace either
-resource directly; one bounded typography profile looks like this:
+Presentation is driven by one injected `Theme` resource. A neutral default is
+registered by `ModalPlugin` so examples run with zero setup. Applications can
+replace it with one explicit, bounded typography profile:
 
 ```rust
-app.insert_resource(Typography {
-    overlay_title: TextMetrics::new(TextFace::Display, 32.0, 1.05, 0.2),
-    overlay_body: TextMetrics::new(TextFace::Body, 18.0, 1.25, 0.0),
+app.insert_resource(Theme {
+    typography: Typography {
+        overlay_title: TextMetrics::new(TextFace::Display, 32.0, 1.05, 0.2),
+        overlay_body: TextMetrics::new(TextFace::Body, 18.0, 1.25, 0.0),
+        ..Default::default()
+    },
     ..Default::default()
 });
 ```
 
 Built-in overlay titles, body rows and buttons, toast messages and actions, and
-standalone button/toggle labels all carry a `TextRole`. They update in place
-when `Typography`, `Theme::display`, or `Theme::body` changes. Bespoke content
-can opt into the same contract with
-`typography.text_style(&theme, TextRole::OverlayBody)` plus a `ThemedText` colour
-role. Toasts reuse the same palette (`ink` fill, `accent` border). Retheming does
-not replace an overlay's root, focus, stack position, or field identity.
+standalone button/toggle labels all carry one `ThemedText` identity. Face,
+metrics, and colour update in place when `Theme` changes. Bespoke content opts
+into exactly the same contract with
+`theme.text_style(TextRole::OverlayBody, TextTone::Secondary)`. Toasts reuse the
+same palette (`ink` fill, `accent` border). Retheming does not replace an
+overlay's root, focus, stack position, or field identity.
 
 ## Transitions
 

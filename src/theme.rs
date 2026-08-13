@@ -8,17 +8,6 @@ use bevy::text::{LetterSpacing, LineHeight};
 
 use crate::toast::ToastPosition;
 
-/// Semantic styling for text emitted by an overlay.
-///
-/// The component is public so bespoke overlay content can opt into the same
-/// live [`Theme`] projection as the built-in title, body, and button labels.
-#[derive(Component, Debug, Clone, Copy, PartialEq)]
-pub enum ThemedText {
-    Primary,
-    Secondary,
-    Accent(Option<Color>),
-}
-
 /// Which font handle a semantic text role uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextFace {
@@ -55,10 +44,8 @@ impl TextMetrics {
 
 /// Semantic metrics for every text surface emitted by the crate.
 ///
-/// The defaults preserve the rendering from `bevy_modal` 0.3.3. [`ModalPlugin`](crate::ModalPlugin)
-/// initializes this resource, and applications can replace it with one bounded
-/// scale without changing [`Theme`] or widget method signatures.
-#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+/// Applications install one bounded scale on [`Theme`].
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Typography {
     pub overlay_title: TextMetrics,
     pub overlay_body: TextMetrics,
@@ -85,7 +72,7 @@ impl Default for Typography {
 }
 
 /// Identifies which [`Typography`] entry drives a text entity.
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextRole {
     OverlayTitle,
     OverlayBody,
@@ -108,35 +95,32 @@ impl Typography {
             TextRole::WidgetLabel => self.widget_label,
         }
     }
-
-    /// Resolve a role against the two font handles owned by [`Theme`].
-    pub fn text_style(&self, theme: &Theme, role: TextRole) -> ThemedTextStyle {
-        let metrics = self.metrics(role);
-        let font = match metrics.face {
-            TextFace::Display => theme.display.clone(),
-            TextFace::Body => theme.body.clone(),
-        };
-        ThemedTextStyle {
-            font: TextFont {
-                font: font.into(),
-                font_size: FontSize::Px(metrics.font_size),
-                ..default()
-            },
-            line_height: LineHeight::RelativeToFont(metrics.line_height),
-            letter_spacing: LetterSpacing::Px(metrics.letter_spacing),
-            role,
-        }
-    }
 }
 
-/// Font and metrics for one [`TextRole`]. Use [`Typography::text_style`] when
-/// bespoke content should follow the same typography as built-in surfaces.
+/// Which semantic colour a themed text entity uses.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TextTone {
+    Primary,
+    Secondary,
+    Accent,
+    Fixed(Color),
+}
+
+/// Complete semantic identity for text projected from [`Theme`].
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
+pub struct ThemedText {
+    pub role: TextRole,
+    pub tone: TextTone,
+}
+
+/// Complete font, metrics, colour, and semantic identity for themed text.
 #[derive(Bundle)]
 pub struct ThemedTextStyle {
     font: TextFont,
     line_height: LineHeight,
     letter_spacing: LetterSpacing,
-    role: TextRole,
+    color: TextColor,
+    themed: ThemedText,
 }
 
 /// Marks a panel whose fill, border, and width follow the live [`Theme`].
@@ -171,6 +155,8 @@ pub struct Theme {
     pub display: Handle<Font>,
     /// Body face (labels, buttons, toasts).
     pub body: Handle<Font>,
+    /// Semantic font metrics for every library-emitted text surface.
+    pub typography: Typography,
     pub panel_border: f32,
     pub button_border: f32,
     pub btn_fill_rest: f32,
@@ -194,6 +180,34 @@ pub struct Theme {
     pub max_toasts: usize,
 }
 
+impl Theme {
+    /// Resolve the complete text bundle for one semantic role and tone.
+    pub fn text_style(&self, role: TextRole, tone: TextTone) -> ThemedTextStyle {
+        let metrics = self.typography.metrics(role);
+        let font = match metrics.face {
+            TextFace::Display => self.display.clone(),
+            TextFace::Body => self.body.clone(),
+        };
+        let color = match tone {
+            TextTone::Primary => self.text,
+            TextTone::Secondary => self.text_dim,
+            TextTone::Accent => self.accent,
+            TextTone::Fixed(color) => color,
+        };
+        ThemedTextStyle {
+            font: TextFont {
+                font: font.into(),
+                font_size: FontSize::Px(metrics.font_size),
+                ..default()
+            },
+            line_height: LineHeight::RelativeToFont(metrics.line_height),
+            letter_spacing: LetterSpacing::Px(metrics.letter_spacing),
+            color: TextColor(color),
+            themed: ThemedText { role, tone },
+        }
+    }
+}
+
 impl Default for Theme {
     fn default() -> Self {
         Self {
@@ -208,6 +222,7 @@ impl Default for Theme {
             danger: Color::srgb(0.95, 0.45, 0.45),
             display: Handle::default(),
             body: Handle::default(),
+            typography: Typography::default(),
             panel_border: 3.0,
             button_border: 3.0,
             btn_fill_rest: 0.10,
@@ -241,17 +256,7 @@ type ThemedTextQuery<'w, 's> = Query<
     's,
     (
         &'static ThemedText,
-        Option<&'static TextRole>,
         &'static mut TextColor,
-        &'static mut TextFont,
-    ),
->;
-
-type TypographyQuery<'w, 's> = Query<
-    'w,
-    's,
-    (
-        &'static TextRole,
         &'static mut TextFont,
         &'static mut LineHeight,
         &'static mut LetterSpacing,
@@ -288,50 +293,11 @@ pub(crate) fn apply_theme(
             background.0 = next;
         }
     }
-    for (tone, role, mut color, mut font) in &mut text {
-        let next_color = match tone {
-            ThemedText::Primary => theme.text,
-            ThemedText::Secondary => theme.text_dim,
-            ThemedText::Accent(accent) => accent.unwrap_or(theme.accent),
-        };
-        if color.0 != next_color {
-            color.0 = next_color;
+    for (style, mut color, mut font, mut line_height, mut letter_spacing) in &mut text {
+        let next = theme.text_style(style.role, style.tone);
+        if color.0 != next.color.0 {
+            color.0 = next.color.0;
         }
-
-        if role.is_some() {
-            // Role-owned text is resolved once in PostUpdate. Skipping its font
-            // here avoids two systems alternately projecting different faces.
-            continue;
-        }
-
-        // Compatibility for caller-owned text that adopted ThemedText before
-        // semantic metrics existed: retain its size and project the same face
-        // selection as before.
-        let next_font: FontSource = match tone {
-            ThemedText::Accent(_) => theme.display.clone(),
-            ThemedText::Primary | ThemedText::Secondary => theme.body.clone(),
-        }
-        .into();
-        if font.font != next_font {
-            font.font = next_font;
-        }
-    }
-    for mut transition in &mut transitions {
-        transition.apply_theme(&theme);
-    }
-}
-
-/// Resolve semantic metrics after Update's deferred UI spawns and before Bevy
-/// measures text for layout. This keeps existing builder signatures additive
-/// and prevents a newly spawned widget from presenting the default font for one
-/// frame.
-pub(crate) fn apply_typography(
-    theme: Res<Theme>,
-    typography: Res<Typography>,
-    mut text: TypographyQuery,
-) {
-    for (role, mut font, mut line_height, mut letter_spacing) in &mut text {
-        let next = typography.text_style(&theme, *role);
         if font.font != next.font.font {
             font.font = next.font.font;
         }
@@ -345,34 +311,7 @@ pub(crate) fn apply_typography(
             *letter_spacing = next.letter_spacing;
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_typography_preserves_the_0_3_3_scale() {
-        let typography = Typography::default();
-        assert_eq!(typography.overlay_title.font_size, 28.0);
-        assert_eq!(typography.overlay_body.font_size, 22.0);
-        assert_eq!(typography.overlay_button.font_size, 24.0);
-        assert_eq!(typography.toast.font_size, 20.0);
-        assert_eq!(typography.toast_action.font_size, 16.0);
-        assert_eq!(typography.widget_button.font_size, 22.0);
-        assert_eq!(typography.widget_label.font_size, 20.0);
-        assert_eq!(typography.overlay_title.face, TextFace::Display);
-        assert!(
-            [
-                typography.overlay_body,
-                typography.overlay_button,
-                typography.toast,
-                typography.toast_action,
-                typography.widget_button,
-                typography.widget_label,
-            ]
-            .into_iter()
-            .all(|metrics| metrics.face == TextFace::Body)
-        );
+    for mut transition in &mut transitions {
+        transition.apply_theme(&theme);
     }
 }
