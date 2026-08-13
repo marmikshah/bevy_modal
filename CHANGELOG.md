@@ -7,13 +7,13 @@ version history and the git log.
 
 ## Unreleased
 
-### Added
+### Changed
 
-- `Typography`, `TextMetrics`, `TextFace`, and `TextRole` make the font face,
-  size, line height, and tracking of every library-emitted text surface
-  configurable without changing existing `Theme` or widget method signatures.
-- Built-in overlays, toasts, and standalone widget labels follow typography and
-  font-handle changes in place; the default resource preserves the 0.3.3 scale.
+- **Breaking:** `Theme` now owns a required `typography: Typography` field.
+- **Breaking:** `ThemedText` now carries a required `TextRole` and `TextTone`;
+  construct the complete reactive bundle with `Theme::text_style`.
+- Built-in overlays, toasts, and standalone widget labels resolve face, size,
+  line height, tracking, and colour from that one theme contract.
 
 ## 0.3.3 — 2026-08-06
 

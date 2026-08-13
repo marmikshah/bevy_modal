@@ -35,7 +35,7 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::build::{ButtonAction, button_visual};
 use crate::focus::{Focusable, Focused};
-use crate::theme::{TextRole, Theme, ThemedText};
+use crate::theme::{TextRole, TextTone, Theme};
 
 // ---- Button ----
 
@@ -162,13 +162,10 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
             ButtonAction::new(Box::new(on_click) as ClickCb),
             Focusable { scope, order },
         ));
-        let color = theme.text;
         ec.with_children(|b| {
             b.spawn((
                 Text::new(text),
-                TextRole::WidgetButton,
-                TextColor(color),
-                ThemedText::Primary,
+                theme.text_style(TextRole::WidgetButton, TextTone::Primary),
             ));
         });
         let id = ec.id();
@@ -218,9 +215,7 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
         ec.with_children(|row| {
             row.spawn((
                 Text::new(text),
-                TextRole::WidgetLabel,
-                TextColor(color),
-                ThemedText::Primary,
+                theme.text_style(TextRole::WidgetLabel, TextTone::Primary),
             ));
             // The track; its knob is pushed left (off) or right (on) by the skin.
             row.spawn((

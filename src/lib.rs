@@ -67,8 +67,8 @@ pub use gate::{UiCapturing, ui_not_capturing};
 pub use safe_area::SafeAreaInsets;
 pub use stack::{Overlay, OverlayCommandsExt, OverlayStack};
 pub use theme::{
-    TextFace, TextMetrics, TextRole, Theme, ThemedPanel, ThemedScrim, ThemedText, ThemedTextStyle,
-    Typography,
+    TextFace, TextMetrics, TextRole, TextTone, Theme, ThemedPanel, ThemedScrim, ThemedText,
+    ThemedTextStyle, Typography,
 };
 pub use toast::{ToastBuilder, ToastLevel, ToastPosition, toast};
 pub use widgets::{Scrollable, Slider, Toggle, WidgetSpawnerExt};
@@ -77,9 +77,9 @@ pub mod prelude {
     pub use crate::{
         CloseReason, ConfirmBuilder, FocusScope, ModalPlugin, Overlay, OverlayBuilder,
         OverlayClosed, OverlayCommandsExt, OverlayOpened, OverlayStack, SafeAreaInsets, Scrollable,
-        Slider, TextFace, TextMetrics, TextRole, Theme, ThemedButton, ThemedPanel, ThemedScrim,
-        ThemedText, ThemedTextStyle, ToastBuilder, ToastLevel, ToastPosition, Toggle, Typography,
-        UiCapturing, WidgetSpawnerExt, confirm, overlay, toast, ui_not_capturing,
+        Slider, TextFace, TextMetrics, TextRole, TextTone, Theme, ThemedButton, ThemedPanel,
+        ThemedScrim, ThemedText, ThemedTextStyle, ToastBuilder, ToastLevel, ToastPosition, Toggle,
+        Typography, UiCapturing, WidgetSpawnerExt, confirm, overlay, toast, ui_not_capturing,
     };
 }
 
@@ -95,7 +95,6 @@ impl Plugin for ModalPlugin {
         app.init_resource::<OverlayStack>()
             .init_resource::<UiCapturing>()
             .init_resource::<Theme>()
-            .init_resource::<Typography>()
             .init_resource::<events::CloseReasons>()
             .init_resource::<SafeAreaInsets>()
             .add_message::<OverlayOpened>()
@@ -136,9 +135,5 @@ impl Plugin for ModalPlugin {
                     safe_area::apply_safe_area,
                 ),
             );
-        app.add_systems(
-            PostUpdate,
-            theme::apply_typography.in_set(bevy::ui::UiSystems::Prepare),
-        );
     }
 }
