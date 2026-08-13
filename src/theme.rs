@@ -270,6 +270,9 @@ pub(crate) fn apply_theme(
     mut text: ThemedTextQuery,
     mut transitions: Query<&mut crate::transition::Transition>,
 ) {
+    if !theme.is_changed() {
+        return;
+    }
     for (mut node, mut background, mut border) in &mut panels {
         let max_width = Val::Px(theme.panel_max_width);
         let panel_border = UiRect::all(Val::Px(theme.panel_border));

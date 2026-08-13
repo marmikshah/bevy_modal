@@ -7,6 +7,13 @@ version history and the git log.
 
 ## Unreleased
 
+## 0.4.1 — 2026-08-13
+
+### Fixed
+
+- Theme projection now skips unchanged frames, preserving caller-owned runtime
+  text colour and opacity between actual theme changes.
+
 ## 0.4.0 — 2026-08-13
 
 ### Changed
