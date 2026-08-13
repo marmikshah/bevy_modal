@@ -12,7 +12,7 @@ use crate::events::CloseReason;
 use crate::focus::{Focusable, Focused};
 use crate::scrim::scrim_bundle;
 use crate::stack::{Overlay, OverlayStack, Z_BASE, Z_STEP, push_root};
-use crate::theme::{Theme, ThemedPanel, ThemedText};
+use crate::theme::{TextRole, Theme, ThemedPanel, ThemedText};
 use crate::transition::{OverlayBody, Transition, request_close};
 
 /// A button's click handler. Boxed `FnMut` so the builder stays non-generic;
@@ -342,11 +342,7 @@ impl Command for SpawnOverlay {
                 let label = world
                     .spawn((
                         Text::new(title),
-                        TextFont {
-                            font: theme.display.clone().into(),
-                            font_size: FontSize::Px(28.0),
-                            ..default()
-                        },
+                        TextRole::OverlayTitle,
                         TextColor(accent),
                         ThemedText::Accent(self.accent),
                     ))
@@ -358,11 +354,7 @@ impl Command for SpawnOverlay {
                 let label = world
                     .spawn((
                         Text::new(line.text),
-                        TextFont {
-                            font: theme.body.clone().into(),
-                            font_size: FontSize::Px(22.0),
-                            ..default()
-                        },
+                        TextRole::OverlayBody,
                         TextColor(theme.text_dim),
                         ThemedText::Secondary,
                     ))
@@ -388,11 +380,7 @@ impl Command for SpawnOverlay {
                 let label = world
                     .spawn((
                         Text::new(text),
-                        TextFont {
-                            font: theme.body.clone().into(),
-                            font_size: FontSize::Px(24.0),
-                            ..default()
-                        },
+                        TextRole::OverlayButton,
                         TextColor(theme.text),
                         ThemedText::Primary,
                     ))

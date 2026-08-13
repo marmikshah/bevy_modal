@@ -9,8 +9,10 @@
 
 use std::time::Duration;
 
+use bevy::asset::uuid_handle;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
+use bevy::text::{LetterSpacing, LineHeight};
 use bevy::time::TimeUpdateStrategy;
 
 use bevy::ui::FocusPolicy;
@@ -21,8 +23,9 @@ use crate::stack::{Z_BASE, Z_STEP};
 use crate::toast::{Toast, ToastLayer};
 use crate::transition::OverlayBody;
 use crate::{
-    ModalPlugin, OverlayCommandsExt, OverlayStack, SafeAreaInsets, Theme, ThemedButton,
-    ThemedPanel, ThemedScrim, ThemedText, UiCapturing, overlay, toast,
+    FocusScope, ModalPlugin, OverlayCommandsExt, OverlayStack, SafeAreaInsets, TextFace,
+    TextMetrics, TextRole, Theme, ThemedButton, ThemedPanel, ThemedScrim, ThemedText, Typography,
+    UiCapturing, WidgetSpawnerExt, overlay, toast,
 };
 
 /// A headless app with the plugin wired, a keyboard resource (which
@@ -664,6 +667,124 @@ fn active_overlay_rethemes_in_place() {
         .query_filtered::<&BackgroundColor, With<ThemedButton>>();
     let button = button.single(app.world()).unwrap();
     assert_eq!(button.0, theme.accent.with_alpha(theme.btn_fill_hover));
+}
+
+#[test]
+fn every_emitted_text_surface_uses_configured_semantic_metrics() {
+    let display: Handle<Font> = uuid_handle!("a262354e-39e3-4d5a-8685-688f24e18416");
+    let body: Handle<Font> = uuid_handle!("6a542e62-4d35-459a-aa74-4d884fda7b4d");
+    let typography = Typography {
+        overlay_title: TextMetrics::new(TextFace::Display, 31.0, 1.01, 0.1),
+        overlay_body: TextMetrics::new(TextFace::Body, 23.0, 1.02, 0.2),
+        overlay_button: TextMetrics::new(TextFace::Body, 25.0, 1.03, 0.3),
+        toast: TextMetrics::new(TextFace::Body, 21.0, 1.04, 0.4),
+        toast_action: TextMetrics::new(TextFace::Body, 17.0, 1.05, 0.5),
+        widget_button: TextMetrics::new(TextFace::Body, 19.0, 1.06, 0.6),
+        widget_label: TextMetrics::new(TextFace::Body, 15.0, 1.07, 0.7),
+    };
+
+    let mut app = test_app();
+    app.insert_resource(Theme {
+        display: display.clone(),
+        body: body.clone(),
+        ..Default::default()
+    });
+    app.insert_resource(typography);
+    app.world_mut()
+        .run_system_once(|mut commands: Commands, theme: Res<Theme>| {
+            overlay(&mut commands, "semantic")
+                .title("Overlay title")
+                .body("Overlay body")
+                .button("Overlay button", |_| {})
+                .push();
+            toast(&mut commands, "Toast message")
+                .action("Toast action", |_| {})
+                .push();
+
+            let scope = commands.spawn((FocusScope, Node::default())).id();
+            commands.entity(scope).with_children(|parent| {
+                parent.button(&theme, scope, 0, "Widget button", |_| {});
+                parent.toggle(&theme, scope, 1, "Widget label", false, |_, _| {});
+            });
+        })
+        .unwrap();
+    app.update();
+
+    let mut query = app
+        .world_mut()
+        .query::<(&Text, &TextRole, &TextFont, &LineHeight, &LetterSpacing)>();
+    let emitted: Vec<_> = query
+        .iter(app.world())
+        .map(|(text, role, font, line_height, letter_spacing)| {
+            (
+                text.as_str().to_string(),
+                *role,
+                font.clone(),
+                *line_height,
+                *letter_spacing,
+            )
+        })
+        .collect();
+    assert_eq!(
+        emitted.len(),
+        7,
+        "every built-in text surface is role-owned"
+    );
+
+    for (text, role, font, line_height, letter_spacing) in emitted {
+        let expected_role = match text.as_str() {
+            "Overlay title" => TextRole::OverlayTitle,
+            "Overlay body" => TextRole::OverlayBody,
+            "Overlay button" => TextRole::OverlayButton,
+            "Toast message" => TextRole::Toast,
+            "Toast action" => TextRole::ToastAction,
+            "Widget button" => TextRole::WidgetButton,
+            "Widget label" => TextRole::WidgetLabel,
+            other => panic!("unexpected emitted text: {other}"),
+        };
+        assert_eq!(role, expected_role, "wrong role for {text}");
+
+        let metrics = typography.metrics(role);
+        let expected_font: FontSource = match metrics.face {
+            TextFace::Display => display.clone(),
+            TextFace::Body => body.clone(),
+        }
+        .into();
+        assert_eq!(font.font, expected_font, "wrong face for {text}");
+        assert_eq!(
+            font.font_size,
+            FontSize::Px(metrics.font_size),
+            "wrong size for {text}"
+        );
+        assert_eq!(
+            line_height,
+            LineHeight::RelativeToFont(metrics.line_height),
+            "wrong line height for {text}"
+        );
+        assert_eq!(
+            letter_spacing,
+            LetterSpacing::Px(metrics.letter_spacing),
+            "wrong letter spacing for {text}"
+        );
+    }
+
+    // The semantic component also keeps an already-open entity live when the
+    // caller swaps profiles or changes which family owns a role.
+    {
+        let mut typography = app.world_mut().resource_mut::<Typography>();
+        typography.overlay_body = TextMetrics::new(TextFace::Display, 37.0, 1.4, 1.25);
+    }
+    app.update();
+    let (_, font, line_height, letter_spacing) = app
+        .world_mut()
+        .query::<(&Text, &TextFont, &LineHeight, &LetterSpacing)>()
+        .iter(app.world())
+        .find(|(text, _, _, _)| text.as_str() == "Overlay body")
+        .expect("overlay body remains open");
+    assert_eq!(font.font, FontSource::from(display));
+    assert_eq!(font.font_size, FontSize::Px(37.0));
+    assert_eq!(*line_height, LineHeight::RelativeToFont(1.4));
+    assert_eq!(*letter_spacing, LetterSpacing::Px(1.25));
 }
 
 #[test]

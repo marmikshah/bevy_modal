@@ -122,6 +122,7 @@ fn ask(mut commands: Commands) {
 | `OverlayCommandsExt::dismiss_overlay(id)` | Despawn the open overlay with this id. |
 | `UiCapturing` / `ui_not_capturing` | The input gate resource + run condition. |
 | `Theme` | Injected colours (incl. semantic + scrim), fonts, borders, transition timing, toast position, sizing. |
+| `Typography` / `TextRole` | Semantic face, size, line-height and tracking for every library-emitted text surface. |
 | `ThemedPanel` / `ThemedScrim` / `ThemedText` / `ThemedButton` | Public semantic components used by built-in overlays and available to bespoke content. |
 
 ## The input-gate contract (read this)
@@ -140,13 +141,26 @@ Toasts are deliberately outside this contract: they never set `UiCapturing`.
 
 ## Theming
 
-Everything is driven by an injected `Theme` resource (colours, fonts, border
-widths, button-state alphas, and the transition timing below). A neutral dark
-default is registered by `ModalPlugin` so examples run with zero setup; insert
-your own to match your game's chrome. Toasts reuse the same palette (`ink` fill,
-`accent` border). Replacing or mutating `Theme` also recolours an already-open
-built-in overlay in place; its root, focus, stack position, and field identity
-do not change.
+Presentation is driven by the injected `Theme` and `Typography` resources. A
+neutral dark theme and the existing 0.3.3 type scale are registered by
+`ModalPlugin` so examples run with zero setup. Applications can replace either
+resource directly; one bounded typography profile looks like this:
+
+```rust
+app.insert_resource(Typography {
+    overlay_title: TextMetrics::new(TextFace::Display, 32.0, 1.05, 0.2),
+    overlay_body: TextMetrics::new(TextFace::Body, 18.0, 1.25, 0.0),
+    ..Default::default()
+});
+```
+
+Built-in overlay titles, body rows and buttons, toast messages and actions, and
+standalone button/toggle labels all carry a `TextRole`. They update in place
+when `Typography`, `Theme::display`, or `Theme::body` changes. Bespoke content
+can opt into the same contract with
+`typography.text_style(&theme, TextRole::OverlayBody)` plus a `ThemedText` colour
+role. Toasts reuse the same palette (`ink` fill, `accent` border). Retheming does
+not replace an overlay's root, focus, stack position, or field identity.
 
 ## Transitions
 
