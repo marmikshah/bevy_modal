@@ -9,9 +9,14 @@ and a set of standalone **themed widgets** — button, toggle, slider and
 scrollable list — that spawn anywhere (title screens, settings, HUD), skinned
 from the same `Theme` and wired into the same keyboard-focus navigation.
 
-> **Status: experimental (0.1, pre-release).** Built to be dogfooded across
-> several games before it hits crates.io; the API will move. Consume via a path
-> or git dependency for now.
+> **Status: experimental (0.x).** The crate is available on crates.io, but the
+> API may still make deliberate breaking changes before 1.0.
+
+Add it to a Bevy 0.19 application with:
+
+```toml
+bevy_modal = "0.4"
+```
 
 ## The bug it kills
 
@@ -220,10 +225,7 @@ The built-in panel is `82%` of the screen, clamped to `Theme::panel_max_width`
 
 | `bevy_modal` | `bevy` |
 |--------------|--------|
-| 0.1          | 0.19   |
-
-Pre-release: consume via a path dependency (`bevy_modal = { path = "../bevy_modal" }`)
-and dogfood before this hits crates.io.
+| 0.1–0.4      | 0.19   |
 
 ## Building overlays
 

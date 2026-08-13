@@ -7,6 +7,8 @@ version history and the git log.
 
 ## Unreleased
 
+## 0.4.0 — 2026-08-13
+
 ### Changed
 
 - **Breaking:** `Theme` now owns a required `typography: Typography` field.
