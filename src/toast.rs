@@ -27,7 +27,7 @@ use std::time::Duration;
 use bevy::picking::prelude::*;
 use bevy::prelude::*;
 
-use crate::theme::Theme;
+use crate::theme::{TextRole, Theme, ThemedText};
 
 /// Toasts float above overlays; they're notifications, not modals.
 pub(crate) const TOAST_Z: i32 = 100_000;
@@ -182,12 +182,9 @@ impl Command for SpawnToast {
         let label = world
             .spawn((
                 Text::new(self.message),
-                TextFont {
-                    font: theme.body.clone().into(),
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
+                TextRole::Toast,
                 TextColor(theme.text),
+                ThemedText::Primary,
             ))
             .id();
         world.entity_mut(toast).add_child(label);
@@ -214,12 +211,9 @@ impl Command for SpawnToast {
             let button_label = world
                 .spawn((
                     Text::new(text),
-                    TextFont {
-                        font: theme.body.clone().into(),
-                        font_size: FontSize::Px(16.0),
-                        ..default()
-                    },
+                    TextRole::ToastAction,
                     TextColor(accent),
+                    ThemedText::Accent(Some(accent)),
                 ))
                 .id();
             world.entity_mut(button).add_child(button_label);

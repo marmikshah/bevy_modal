@@ -35,7 +35,7 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::build::{ButtonAction, button_visual};
 use crate::focus::{Focusable, Focused};
-use crate::theme::{Theme, ThemedText};
+use crate::theme::{TextRole, Theme, ThemedText};
 
 // ---- Button ----
 
@@ -162,16 +162,11 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
             ButtonAction::new(Box::new(on_click) as ClickCb),
             Focusable { scope, order },
         ));
-        let font = theme.body.clone();
         let color = theme.text;
         ec.with_children(|b| {
             b.spawn((
                 Text::new(text),
-                TextFont {
-                    font: font.into(),
-                    font_size: FontSize::Px(22.0),
-                    ..default()
-                },
+                TextRole::WidgetButton,
                 TextColor(color),
                 ThemedText::Primary,
             ));
@@ -200,7 +195,6 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
     ) -> EntityCommands<'_> {
         let accent = theme.accent;
         let text = label.into();
-        let font = theme.body.clone();
         let color = theme.text;
         let track_border = theme.button_border;
 
@@ -224,12 +218,9 @@ impl WidgetSpawnerExt for ChildSpawnerCommands<'_> {
         ec.with_children(|row| {
             row.spawn((
                 Text::new(text),
-                TextFont {
-                    font: font.into(),
-                    font_size: FontSize::Px(20.0),
-                    ..default()
-                },
+                TextRole::WidgetLabel,
                 TextColor(color),
+                ThemedText::Primary,
             ));
             // The track; its knob is pushed left (off) or right (on) by the skin.
             row.spawn((

@@ -7,6 +7,14 @@ version history and the git log.
 
 ## Unreleased
 
+### Added
+
+- `Typography`, `TextMetrics`, `TextFace`, and `TextRole` make the font face,
+  size, line height, and tracking of every library-emitted text surface
+  configurable without changing existing `Theme` or widget method signatures.
+- Built-in overlays, toasts, and standalone widget labels follow typography and
+  font-handle changes in place; the default resource preserves the 0.3.3 scale.
+
 ## 0.3.3 — 2026-08-06
 
 ### Added
