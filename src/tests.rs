@@ -670,6 +670,32 @@ fn active_overlay_rethemes_in_place() {
 }
 
 #[test]
+fn unchanged_theme_preserves_runtime_text_colour() {
+    let mut app = test_app();
+    let text = app
+        .world_mut()
+        .run_system_once(|mut commands: Commands, theme: Res<Theme>| {
+            commands
+                .spawn((
+                    Text::new("Fading"),
+                    theme.text_style(TextRole::OverlayBody, TextTone::Primary),
+                ))
+                .id()
+        })
+        .unwrap();
+    app.update();
+
+    app.world_mut()
+        .get_mut::<TextColor>(text)
+        .unwrap()
+        .0
+        .set_alpha(0.25);
+    app.update();
+
+    assert_eq!(app.world().get::<TextColor>(text).unwrap().0.alpha(), 0.25);
+}
+
+#[test]
 fn every_emitted_text_surface_uses_configured_semantic_metrics() {
     let display: Handle<Font> = uuid_handle!("a262354e-39e3-4d5a-8685-688f24e18416");
     let body: Handle<Font> = uuid_handle!("6a542e62-4d35-459a-aa74-4d884fda7b4d");
