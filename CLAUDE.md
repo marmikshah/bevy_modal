@@ -4,6 +4,8 @@ Agent onboarding. `make` is the entry point; keep this short and current.
 
 ## What this is
 
+**Deprecated:** no new features; only the final deprecation release remains.
+
 A modal/overlay stack over native `bevy_ui`: a blocking scrim, deterministic
 layering, an input-capture gate, and an ergonomic `overlay()` builder — plus
 open/close transitions, keyboard focus navigation, lifecycle messages, safe-area

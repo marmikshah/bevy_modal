@@ -7,6 +7,11 @@ version history and the git log.
 
 ## Unreleased
 
+### Deprecated
+
+- The crate is no longer maintained. This is its final release; copy the parts
+  you use into your own code.
+
 ## 0.4.1 — 2026-08-13
 
 ### Fixed
