@@ -1,6 +1,8 @@
 //! `bevy_modal` — a modal/overlay stack over native `bevy_ui`, plus transient
 //! toasts and a confirm dialog.
 //!
+//! **Deprecated:** no longer maintained; this is the final release.
+//!
 //! The problem it solves: stacked popups in raw `bevy_ui` leak input. A smaller
 //! popup spawned over a larger one doesn't cover the larger one's buttons, so
 //! picking never occludes them and clicks fall through. And anything that reads

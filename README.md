@@ -1,5 +1,11 @@
 # bevy_modal
 
+> **Deprecated.** `bevy_modal` is no longer maintained and will get no further
+> releases after this one. Existing versions stay on crates.io and keep
+> working with Bevy 0.19. If you depend on it, copy the parts you use into your
+> own code (the crate is MIT). The core is `stack.rs`, `scrim.rs` and `gate.rs`,
+> with `events.rs` and `transition.rs` behind them.
+
 A modal/overlay stack for native `bevy_ui`. It fixes one specific, recurring
 bug — **stacked popups leak input** — and folds away the `children!` /
 `SpawnWith` boilerplate while it's there. No retained layout engine: it emits
